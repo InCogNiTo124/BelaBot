@@ -1,78 +1,67 @@
-from typing import List
-from enum import Enum, auto
+from typing import List, Tuple, Optional
+from enum import Enum
+import random
 
-class Suit(Enum):
-    HEARTS = auto()
-    DIAMONDS = auto()
-    SPADES = auto()
-    CLUBS = auto()
+from .card import Card, Suit
 
-    def __repr__(self):
-        if self is Suit.HEARTS:
-            return "<3 "
-        elif self is Suit.DIAMONDS:
-            return "(o)"
-        elif self is Suit.SPADES:
-            return "-\u0190>"
-        elif self is Suit.CLUBS:
-            return "-\u0190\u22fb"
-        else:
-            raise ValueError(f"Not a Suit: {repr(self)}")
 
-class Rank(Enum):
-    VII = auto()
-    VIII = auto()
-    IX = auto()
-    X = auto()
-    JACK = auto()
-    QUEEN = auto()
-    KING = auto()
-    ACE = auto()
-
-    def __repr__(self):
-        if self is Rank.VII:
-            return "7"
-        elif self is Rank.VIII:
-            return "8"
-        elif self is Rank.IX:
-            return "9"
-        elif self is Rank.X:
-            return "X"
-        elif self is Rank.JACK:
-            return "J"
-        elif self is Rank.QUEEN:
-            return "Q"
-        elif self is Rank.KING:
-            return "K"
-        elif self is Rank.ACE:
-            return "A"
-        else:
-            raise ValueError("Not a Rank: {repr(self}")
+class Adut(Enum):
+    HEARTS = Suit.HEARTS.value
+    DIAMONDS = Suit.DIAMONDS.value
+    SPADES = Suit.SPADES.value
+    CLUBS = Suit.CLUBS.value
+    NEXT = 5
 
 
 class Player():
-    def __init__(self):
+    def __init__(self: 'Player') -> None:
+        self.cards: List[Card] = []
         return
 
-    def get_adut(self):
+    def set_cards(self: 'Player', cards: List[int]) -> None:
+        self.cards = [Card.from_int(t) for t in cards]
         return
+
+    def get_adut(self: 'Player', is_muss: bool) -> Adut:
+        return Adut(random.choice(range(4 if is_muss else 5))+1)
+
 
 class Belot():
-    def __init__(self, players: List[Player]):
+    def __init__(self: 'Belot', players: List[Player]):
         self.players = players
+        self.deck = range(32)
         return
 
-    def play(self):
-        self.shuffle()
-        self.adut = self.get_adut()
+    def play(self: 'Belot') -> None:
+        current_dealer_index = 0
+        mi, vi = 0, 0
+        while mi <= 1000 and vi <= 1000 or mi == vi:
+            round_mi, round_vi = self.round(current_dealer_index)
+            current_dealer_index = (current_dealer_index + 1) % 4
+            mi += round_mi
+            vi += round_vi
+        print(f"MI {mi} \t {vi} VI")
         return
 
-    def get_adut(self):
+    def round(self: 'Belot', dealer_index: int) -> Tuple[int, int]:
+        adut = self.get_adut(dealer_index)
+        print(adut)
+        x = random.randint(0, 162)
+        return x, 162 - x
+
+    def shuffle(self: 'Belot') -> None:
+        deck = random.sample(self.deck, len(self.deck))
+        cards_per_player = len(self.deck) // len(self.players)
         for i, player in enumerate(self.players):
-            adut = player.get_adut()
-            return
-
-    def shuffle(self):
-
+            player.set_cards(deck[i*cards_per_player:(i+1)*cards_per_player])
         return
 
+    def get_adut(self: 'Belot', dealer_index: int) -> Optional[Suit]:
+        for i in range(1, 5):   # the dealer calls last
+            player_index = (dealer_index + i) % len(self.players)
+            print(player_index)
+            player = self.players[player_index]
+            adut = player.get_adut(is_muss=(i == 4))
+            if adut != Adut.NEXT:
+                return Suit(adut.value)
+        return None
