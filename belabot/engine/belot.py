@@ -1,8 +1,16 @@
-from typing import List, Tuple, Optional
-from enum import Enum
-import random
-
 from .card import Card, Suit
+
+from enum import Enum
+import logging
+import os
+import random
+import sys
+from typing import List, Tuple, Optional
+
+
+log = logging.getLogger(__name__)
+log.addHandler(logging.StreamHandler(sys.stdout))
+log.setLevel(os.environ.get("LOGLEVEL", "INFO").upper())
 
 
 class Adut(Enum):
@@ -40,12 +48,12 @@ class Belot():
             current_dealer_index = (current_dealer_index + 1) % 4
             mi += round_mi
             vi += round_vi
-        print(f"MI {mi} \t {vi} VI")
+        log.info(f"MI {mi} \t {vi} VI")
         return
 
     def round(self: 'Belot', dealer_index: int) -> Tuple[int, int]:
         adut = self.get_adut(dealer_index)
-        print(adut)
+        log.debug(adut)
         x = random.randint(0, 162)
         return x, 162 - x
 
@@ -59,7 +67,7 @@ class Belot():
     def get_adut(self: 'Belot', dealer_index: int) -> Optional[Suit]:
         for i in range(1, 5):   # the dealer calls last
             player_index = (dealer_index + i) % len(self.players)
-            print(player_index)
+            log.debug(player_index)
             player = self.players[player_index]
             adut = player.get_adut(is_muss=(i == 4))
             if adut != Adut.NEXT:
