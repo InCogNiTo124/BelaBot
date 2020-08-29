@@ -1,6 +1,8 @@
 from enum import Enum, auto
+from functools import total_ordering
 
 
+@total_ordering
 class Suit(Enum):
     HEARTS = auto()
     DIAMONDS = auto()
@@ -19,7 +21,17 @@ class Suit(Enum):
         else:
             raise ValueError(f"Not a Suit: {repr(self)}")
 
+    def __lt__(self: 'Suit', other: object) -> bool:
+        return isinstance(other, Suit) and self.value < other.value
 
+    def __eq__(self: 'Suit', other: object) -> bool:
+        return isinstance(other, Suit) and self.value == other.value
+
+    def __hash__(self: 'Suit') -> int:
+        return hash(self.value)
+
+
+@total_ordering
 class Rank(Enum):
     VII = auto()
     VIII = auto()
@@ -50,7 +62,17 @@ class Rank(Enum):
         else:
             raise ValueError("Not a Rank: {repr(self}")
 
+    def __lt__(self: 'Rank', other: object) -> bool:
+        return isinstance(other, Rank) and self.value < other.value
 
+    def __eq__(self: 'Rank', other: object) -> bool:
+        return isinstance(other, Rank) and self.value == other.value
+
+    def __hash__(self: 'Rank') -> int:
+        return hash(self.value)
+
+
+@total_ordering
 class Card():
     def __init__(self, rank: Rank, suit: Suit):
         self.rank = rank
@@ -66,10 +88,11 @@ class Card():
     def to_int(self: 'Card') -> int:
         return (self.suit.value - 1) * len(Rank) + self.rank.value - 1
 
-    def __eq__(self: 'Card', card: object) -> bool:
-        if not isinstance(card, Card):
-            return False
-        return self.suit == card.suit and self.rank == card.rank
-
     def __repr__(self: 'Card') -> str:
         return f"{repr(self.rank)} {repr(self.suit)}"
+
+    def __lt__(self: 'Card', other: object) -> bool:
+        return isinstance(other, Card) and self.to_int() < other.to_int()
+
+    def __eq__(self: 'Card', other: object) -> bool:
+        return isinstance(other, Card) and self.to_int() == other.to_int()
