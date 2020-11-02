@@ -7,6 +7,7 @@ import random
 import sys
 from typing import List, Tuple, Optional
 
+random = random.SystemRandom()
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.StreamHandler(sys.stdout))
