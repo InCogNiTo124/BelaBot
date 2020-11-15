@@ -7,7 +7,7 @@ import random
 import sys
 from typing import List, Tuple, Optional
 
-random = random.SystemRandom()
+random_gen = random.SystemRandom()
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.StreamHandler(sys.stdout))
@@ -22,26 +22,26 @@ class Adut(Enum):
     NEXT = 5
 
 
-class Player():
-    def __init__(self: 'Player') -> None:
+class Player:
+    def __init__(self: "Player") -> None:
         self.cards: List[Card] = []
         return
 
-    def set_cards(self: 'Player', cards: List[int]) -> None:
+    def set_cards(self: "Player", cards: List[int]) -> None:
         self.cards = [Card.from_int(t) for t in cards]
         return
 
-    def get_adut(self: 'Player', is_muss: bool) -> Adut:
-        return Adut(random.choice(range(4 if is_muss else 5))+1)
+    def get_adut(self: "Player", is_muss: bool) -> Adut:
+        return Adut(random_gen.choice(range(4 if is_muss else 5)) + 1)
 
 
-class Belot():
-    def __init__(self: 'Belot', players: List[Player]):
+class Belot:
+    def __init__(self: "Belot", players: List[Player]):
         self.players = players
         self.deck = range(32)
         return
 
-    def play(self: 'Belot') -> None:
+    def play(self: "Belot") -> None:
         current_dealer_index = 0
         mi, vi = 0, 0
         while mi <= 1000 and vi <= 1000 or mi == vi:
@@ -52,21 +52,21 @@ class Belot():
         log.info(f"MI {mi} \t {vi} VI")
         return
 
-    def round(self: 'Belot', dealer_index: int) -> Tuple[int, int]:
+    def round(self: "Belot", dealer_index: int) -> Tuple[int, int]:
         adut = self.get_adut(dealer_index)
         log.debug(adut)
-        x = random.randint(0, 162)
+        x = random_gen.randint(0, 162)
         return x, 162 - x
 
-    def shuffle(self: 'Belot') -> None:
-        deck = random.sample(self.deck, len(self.deck))
+    def shuffle(self: "Belot") -> None:
+        deck = random_gen.sample(self.deck, len(self.deck))
         cards_per_player = len(self.deck) // len(self.players)
         for i, player in enumerate(self.players):
-            player.set_cards(deck[i*cards_per_player:(i+1)*cards_per_player])
+            player.set_cards(deck[i * cards_per_player: (i + 1) * cards_per_player])
         return
 
-    def get_adut(self: 'Belot', dealer_index: int) -> Optional[Suit]:
-        for i in range(1, 5):   # the dealer calls last
+    def get_adut(self: "Belot", dealer_index: int) -> Optional[Suit]:
+        for i in range(1, 5):  # the dealer calls last
             player_index = (dealer_index + i) % len(self.players)
             log.debug(player_index)
             player = self.players[player_index]
