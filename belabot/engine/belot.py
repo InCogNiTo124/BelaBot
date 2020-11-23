@@ -62,7 +62,7 @@ class Belot:
         deck = random_gen.sample(self.deck, len(self.deck))
         cards_per_player = len(self.deck) // len(self.players)
         for i, player in enumerate(self.players):
-            player.set_cards(deck[i * cards_per_player: (i + 1) * cards_per_player])
+            player.set_cards(deck[i * cards_per_player : (i + 1) * cards_per_player])
         return
 
     def get_adut(self: "Belot", dealer_index: int) -> Optional[Suit]:

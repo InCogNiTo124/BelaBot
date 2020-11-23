@@ -105,12 +105,12 @@ def get_player_declarations(cards: List[Card]) -> Sequence[Declaration]:
     ]
     suit_detectors: List[DeclarationDetector] = [
         SuitDeclarationDetector(length)
-        for length, value in VALUES_SEQUENCE.items()
+        for length, value in sorted(VALUES_SEQUENCE.items(), key=lambda item: -item[0])
         if value > 0
     ]
     # TODO: fix sorting subtleties.
     for detector in sorted(
-        rank_detectors + suit_detectors,
+        suit_detectors + rank_detectors,
         key=lambda detector: (
             detector.value(),
             isinstance(detector, RankDeclarationDetector),
