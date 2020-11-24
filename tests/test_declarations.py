@@ -43,6 +43,13 @@ def test_multiple_suit_one_declarations():
 
 
 def test_one_suit_multiple_declarations():
+    def compare(pair):
+        return (
+            abs(max(pair[0]).value - min(pair[1]).value) > 1
+            and abs(max(pair[1]).value - min(pair[0]).value) > 1
+            and len(set(pair[0]) & set(pair[1])) == 0
+        )
+
     for suit in Suit:
         for run_length1, run_length2 in filter(
             lambda t: t[0] + t[1] < 8, it.product(range(3, 5), range(3, 5))
@@ -54,11 +61,6 @@ def test_one_suit_multiple_declarations():
             # this means run length of 3 and 3 must not make
             # one continuous length of 6
             # hence the first two conditions
-            compare = lambda pair: (
-                abs(max(pair[0]).value - min(pair[1]).value) > 1
-                and abs(max(pair[1]).value - min(pair[0]).value) > 1
-                and len(set(pair[0]) & set(pair[1])) == 0
-            )
             for ranks1, ranks2 in filter(compare, product):
                 cards = [Card(rank=rank, suit=suit) for rank in ranks1] + [
                     Card(rank=rank, suit=suit) for rank in ranks2
@@ -91,4 +93,61 @@ def test_two_rank_declarations():
         assert len(declarations) == 2
         assert RankDeclaration(rank1, VALUES_RANK[rank1]) in declarations
         assert RankDeclaration(rank2, VALUES_RANK[rank2]) in declarations
+    return
+
+
+def test_rank_suit3():
+    run_length = 3
+    for suit in Suit:
+        for ranks in mit.windowed(Rank, run_length):
+            ranks = set(ranks)
+            cards = set(Card(suit=suit, rank=rank) for rank in ranks)
+            possible_ranks = set(VALUES_RANK.keys()) & ranks
+            for the_rank in possible_ranks:
+                round_cards = cards | set(
+                    Card(rank=the_rank, suit=suit) for suit in Suit
+                )
+                declarations = get_player_declarations(list(round_cards))
+                assert len(declarations) == 1
+                assert RankDeclaration(the_rank, VALUES_RANK[the_rank]) in declarations
+    return
+
+
+def test_rank_suit4():
+    run_length = 4
+    for suit in Suit:
+        for ranks in mit.windowed(Rank, run_length):
+            cards = set(Card(suit=suit, rank=rank) for rank in ranks)
+            # restrict the inputs to disallow possible sub declarations
+            # eg 7 8 9 X X X X can technically be 2 different declarations
+            # we want to avoid that
+            ranks = set(ranks[1:-1])
+            possible_ranks = set(VALUES_RANK.keys()) & ranks
+            for the_rank in possible_ranks:
+                round_cards = cards | set(
+                    Card(rank=the_rank, suit=suit) for suit in Suit
+                )
+                declarations = get_player_declarations(list(round_cards))
+                assert len(declarations) == 1
+                assert RankDeclaration(the_rank, VALUES_RANK[the_rank]) in declarations
+    return
+
+
+def test_rank_suit5():
+    run_length = 5
+    for suit in Suit:
+        for ranks in mit.windowed(Rank, run_length):
+            cards = set(Card(suit=suit, rank=rank) for rank in ranks)
+            # restrict the inputs to disallow possible sub declarations
+            # eg 7 8 9 X J J J J can technically be 2 different declarations
+            # we want to avoid that
+            ranks = set(ranks[2:-2])
+            possible_ranks = set(VALUES_RANK.keys()) & ranks
+            for the_rank in possible_ranks:
+                round_cards = cards | set(
+                    Card(rank=the_rank, suit=suit) for suit in Suit
+                )
+                declarations = get_player_declarations(list(round_cards))
+                assert len(declarations) == 1
+                assert RankDeclaration(the_rank, VALUES_RANK[the_rank]) in declarations
     return

@@ -71,7 +71,7 @@ class Rank(Enum):
     def __hash__(self: "Rank") -> int:
         return hash(self.value)
 
-    def points(self, adut: bool=False) -> int:
+    def points(self, adut: bool = False) -> int:
         value_dict = {
             Rank.VII: 0,
             Rank.VIII: 0,
@@ -80,7 +80,7 @@ class Rank(Enum):
             Rank.JACK: 20 if adut else 2,
             Rank.QUEEN: 3,
             Rank.KING: 4,
-            Rank.ACE: 11
+            Rank.ACE: 11,
         }
         return value_dict[self]
 
@@ -109,3 +109,6 @@ class Card:
 
     def __eq__(self: "Card", other: object) -> bool:
         return isinstance(other, Card) and self.to_int() == other.to_int()
+
+    def __hash__(self) -> int:
+        return hash(self.to_int())

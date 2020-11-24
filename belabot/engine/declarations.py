@@ -85,6 +85,7 @@ class RankDeclarationDetector(DeclarationDetector):
             map(lambda suit: Card(rank=self.declaration_rank, suit=suit).to_int(), Suit)
         )
         if cards <= player_cards:
+            player_cards -= cards
             return [RankDeclaration(self.declaration_rank, self.value())]
         else:
             return []
@@ -98,7 +99,9 @@ def get_player_declarations(cards: List[Card]) -> Sequence[Declaration]:
     player_cards = set(map(Card.to_int, cards))
     rank_detectors: List[DeclarationDetector] = [
         RankDeclarationDetector(rank)
-        for rank, value in sorted(VALUES_RANK.items(), key=lambda pair: pair[0].points(), reverse=True)
+        for rank, value in sorted(
+            VALUES_RANK.items(), key=lambda pair: pair[0].points(), reverse=True
+        )
         if value > 0
     ]
     suit_detectors: List[DeclarationDetector] = [
@@ -115,8 +118,11 @@ def get_player_declarations(cards: List[Card]) -> Sequence[Declaration]:
         reverse=True,
     )
 
+    # please note that the variable player_cards is mutated by the Detector classes
+    # this is by design to disallow using one card in multiple declarations
     for detector in detectors:
-        declarations.extend(detector(player_cards))
+        new_declarations = detector(player_cards)
+        declarations.extend(new_declarations)
         if len(player_cards) <= 2:
             break
     return declarations
