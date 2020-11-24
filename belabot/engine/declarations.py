@@ -37,11 +37,11 @@ class SuitDeclaration(Declaration):
 
 
 class DeclarationDetector(abc.ABC):
-    def __init__(self: "DeclarationDetector") -> None:
+    def __init__(self) -> None:
         return
 
     @abc.abstractmethod
-    def value(self: "DeclarationDetector") -> int:
+    def value(self) -> int:
         pass
 
     @abc.abstractmethod
@@ -50,13 +50,11 @@ class DeclarationDetector(abc.ABC):
 
 
 class SuitDeclarationDetector(DeclarationDetector):
-    def __init__(self: "SuitDeclarationDetector", length: int) -> None:
+    def __init__(self, length: int) -> None:
         self.sequence_length = length
         return
 
-    def __call__(
-        self: "SuitDeclarationDetector", player_cards: Set[int]
-    ) -> Sequence[Declaration]:
+    def __call__(self, player_cards: Set[int]) -> Sequence[Declaration]:
         declarations: MutableSequence[SuitDeclaration] = []
         for suit in Suit:
             for sequence in mit.windowed(reversed(Rank), self.sequence_length):
