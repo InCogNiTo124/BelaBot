@@ -71,6 +71,19 @@ class Rank(Enum):
     def __hash__(self: "Rank") -> int:
         return hash(self.value)
 
+    def points(self, adut: bool=False) -> int:
+        value_dict = {
+            Rank.VII: 0,
+            Rank.VIII: 0,
+            Rank.IX: 14 if adut else 0,
+            Rank.X: 10,
+            Rank.JACK: 20 if adut else 2,
+            Rank.QUEEN: 3,
+            Rank.KING: 4,
+            Rank.ACE: 11
+        }
+        return value_dict[self]
+
 
 @total_ordering
 class Card:

@@ -8,8 +8,8 @@ import dataclasses
 VALUES_SEQUENCE = {0: 0, 1: 0, 2: 0, 3: 20, 4: 50, 5: 100, 6: 100, 7: 100, 8: 1000}
 
 VALUES_RANK = {
-    Rank.VII: 0,
-    Rank.VIII: 0,
+    # Rank.VII: 0,
+    # Rank.VIII: 0,
     Rank.IX: 150,
     Rank.X: 100,
     Rank.JACK: 200,
@@ -98,7 +98,7 @@ def get_player_declarations(cards: List[Card]) -> Sequence[Declaration]:
     player_cards = set(map(Card.to_int, cards))
     rank_detectors: List[DeclarationDetector] = [
         RankDeclarationDetector(rank)
-        for rank, value in VALUES_RANK.items()
+        for rank, value in sorted(VALUES_RANK.items(), key=lambda pair: pair[0].points(), reverse=True)
         if value > 0
     ]
     suit_detectors: List[DeclarationDetector] = [
@@ -106,15 +106,16 @@ def get_player_declarations(cards: List[Card]) -> Sequence[Declaration]:
         for length, value in sorted(VALUES_SEQUENCE.items(), key=lambda item: -item[0])
         if value > 0
     ]
-    # TODO: fix sorting subtleties.
-    for detector in sorted(
+    detectors = sorted(
         suit_detectors + rank_detectors,
         key=lambda detector: (
             detector.value(),
             isinstance(detector, RankDeclarationDetector),
         ),
         reverse=True,
-    ):
+    )
+
+    for detector in detectors:
         declarations.extend(detector(player_cards))
         if len(player_cards) <= 2:
             break
