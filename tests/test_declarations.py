@@ -2,6 +2,7 @@ from belabot.engine.declarations import (
     get_player_declarations,
     RankDeclaration,
     SuitDeclaration,
+    VALUES_RANK,
 )
 from belabot.engine.card import Card, Suit, Rank
 import itertools as it
@@ -67,4 +68,27 @@ def test_one_suit_multiple_declarations():
                 assert len(declarations) == 2, print(f"{declarations}, {cards}")
                 assert SuitDeclaration(ranks1[-1], suit, run_length1) in declarations
                 assert SuitDeclaration(ranks2[-1], suit, run_length2) in declarations
+    return
+
+
+def test_single_rank_declaration():
+    for rank in VALUES_RANK:
+        cards = [Card(rank=rank, suit=suit) for suit in Suit]
+        assert len(cards) == 4
+        declarations = get_player_declarations(cards)
+        assert len(declarations) == 1
+        assert RankDeclaration(rank, VALUES_RANK[rank]) in declarations
+    return
+
+
+def test_two_rank_declarations():
+    for rank1, rank2 in it.combinations(VALUES_RANK, 2):
+        cards = [Card(rank=rank1, suit=suit) for suit in Suit] + [
+            Card(rank=rank2, suit=suit) for suit in Suit
+        ]
+        assert len(cards) == 8
+        declarations = get_player_declarations(cards)
+        assert len(declarations) == 2
+        assert RankDeclaration(rank1, VALUES_RANK[rank1]) in declarations
+        assert RankDeclaration(rank2, VALUES_RANK[rank2]) in declarations
     return
