@@ -79,7 +79,7 @@ def test_single_rank_declaration():
         assert len(cards) == 4
         declarations = get_player_declarations(cards)
         assert len(declarations) == 1
-        assert RankDeclaration(rank, VALUES_RANK[rank]) in declarations
+        assert RankDeclaration(rank) in declarations
     return
 
 
@@ -91,8 +91,8 @@ def test_two_rank_declarations():
         assert len(cards) == 8
         declarations = get_player_declarations(cards)
         assert len(declarations) == 2
-        assert RankDeclaration(rank1, VALUES_RANK[rank1]) in declarations
-        assert RankDeclaration(rank2, VALUES_RANK[rank2]) in declarations
+        assert RankDeclaration(rank1) in declarations
+        assert RankDeclaration(rank2) in declarations
     return
 
 
@@ -109,7 +109,7 @@ def test_rank_suit3():
                 )
                 declarations = get_player_declarations(list(round_cards))
                 assert len(declarations) == 1
-                assert RankDeclaration(the_rank, VALUES_RANK[the_rank]) in declarations
+                assert RankDeclaration(the_rank) in declarations
     return
 
 
@@ -129,7 +129,7 @@ def test_rank_suit4():
                 )
                 declarations = get_player_declarations(list(round_cards))
                 assert len(declarations) == 1
-                assert RankDeclaration(the_rank, VALUES_RANK[the_rank]) in declarations
+                assert RankDeclaration(the_rank) in declarations
     return
 
 
@@ -149,5 +149,5 @@ def test_rank_suit5():
                 )
                 declarations = get_player_declarations(list(round_cards))
                 assert len(declarations) == 1
-                assert RankDeclaration(the_rank, VALUES_RANK[the_rank]) in declarations
+                assert RankDeclaration(the_rank) in declarations
     return

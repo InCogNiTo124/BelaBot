@@ -31,6 +31,14 @@ class Suit(Enum):
         return hash(self.value)
 
 
+class Adut(Enum):
+    HEARTS = Suit.HEARTS.value
+    DIAMONDS = Suit.DIAMONDS.value
+    SPADES = Suit.SPADES.value
+    CLUBS = Suit.CLUBS.value
+    NEXT = 5
+
+
 @total_ordering
 class Rank(Enum):
     VII = auto()

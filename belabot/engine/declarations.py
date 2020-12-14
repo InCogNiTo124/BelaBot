@@ -3,6 +3,7 @@ from .card import Card, Rank, Suit
 from typing import cast, List, MutableSequence, Sequence, Set, Tuple
 import more_itertools as mit
 import dataclasses
+from functools import total_ordering
 
 
 VALUES_SEQUENCE = {0: 0, 1: 0, 2: 0, 3: 20, 4: 50, 5: 100, 6: 100, 7: 100, 8: 1000}
@@ -19,14 +20,39 @@ VALUES_RANK = {
 }
 
 
+@total_ordering
 class Declaration:
-    pass
+    def value(self) -> int:
+        pass
+
+    def __lt__(self, other: "Declaration") -> bool:
+        pass
+
+    def __eq__(self, other: object) -> bool:
+        pass
 
 
 @dataclasses.dataclass
 class RankDeclaration(Declaration):
     rank: Rank
-    value: int
+
+    def value(self) -> int:
+        return VALUES_RANK[self.rank]
+
+    def __lt__(self, other: object) -> bool:
+        assert isinstance(other, Declaration)
+        if self.value() < other.value():
+            return True
+        elif isinstance(other, SuitDeclaration):
+            return False
+        elif isinstance(other, RankDeclaration):
+            return self.value() < other.value() or self.rank < other.rank
+        return False
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, RankDeclaration):
+            return self.rank == other.rank
+        return False
 
 
 @dataclasses.dataclass
@@ -34,6 +60,24 @@ class SuitDeclaration(Declaration):
     high_rank: Rank
     suit: Suit
     length: int
+
+    def value(self) -> int:
+        return VALUES_SEQUENCE[self.length]
+
+    def __lt__(self, other: object) -> bool:
+        assert isinstance(other, Declaration)
+        if self.value() < other.value():
+            return True
+        elif isinstance(other, RankDeclaration):
+            return True
+        elif isinstance(other, SuitDeclaration):
+            return self.value() < other.value() or self.high_rank < other.high_rank
+        return False
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, SuitDeclaration):
+            return self.high_rank == other.high_rank
+        return False
 
 
 class DeclarationDetector(abc.ABC):
@@ -86,7 +130,7 @@ class RankDeclarationDetector(DeclarationDetector):
         )
         if cards <= player_cards:
             player_cards -= cards
-            return [RankDeclaration(self.declaration_rank, self.value())]
+            return [RankDeclaration(self.declaration_rank)]
         else:
             return []
 
@@ -94,8 +138,8 @@ class RankDeclarationDetector(DeclarationDetector):
         return VALUES_RANK[self.declaration_rank]
 
 
-def get_player_declarations(cards: List[Card]) -> Sequence[Declaration]:
-    declarations: MutableSequence[Declaration] = []
+def get_player_declarations(cards: List[Card]) -> List[Declaration]:
+    declarations: List = []
     player_cards = set(map(Card.to_int, cards))
     rank_detectors: List[DeclarationDetector] = [
         RankDeclarationDetector(rank)

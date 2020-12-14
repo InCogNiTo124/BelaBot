@@ -1,6 +1,7 @@
-from .card import Card, Suit
+from .card import Suit, Adut
+from .player import Player
+from .declarations import get_player_declarations
 
-from enum import Enum
 import logging
 import os
 import random
@@ -14,32 +15,6 @@ log.addHandler(logging.StreamHandler(sys.stdout))
 log.setLevel(os.environ.get("BB_LOGLEVEL", "INFO").upper())
 
 
-class Adut(Enum):
-    HEARTS = Suit.HEARTS.value
-    DIAMONDS = Suit.DIAMONDS.value
-    SPADES = Suit.SPADES.value
-    CLUBS = Suit.CLUBS.value
-    NEXT = 5
-
-
-class Player:
-    def __init__(self) -> None:
-        self.cards: List[Card] = []
-        return
-
-    def add_cards(self, cards: List[int]) -> None:
-        self.cards.extend([Card.from_int(t) for t in cards])
-        return
-
-    def clear_cards(self) -> None:
-        self.cards.clear()
-        return
-
-    def get_adut(self, is_muss: bool) -> Adut:
-        print('\t', self.cards)
-        return Adut(random_gen.choice(range(4 if is_muss else 5)) + 1)
-
-
 class Belot:
     def __init__(self, players: List[Player]):
         self.players = players
@@ -47,6 +22,8 @@ class Belot:
         return
 
     def play(self) -> None:
+        # mi is implicitly the name of the team made out of players at indices 0 and 2
+        # vi team is made out of players 1 and 3
         current_dealer_index = 0
         mi, vi = 0, 0
         while mi <= 1000 and vi <= 1000 or mi == vi:
@@ -59,16 +36,26 @@ class Belot:
 
     def round(self, dealer_index: int) -> Tuple[int, int]:
         first_6, talons = self.shuffle()
-        for cards, player in zip(first_6, self.players):
-            player.add_cards(cards)
+        self.deal_cards(first_6)
         adut = self.get_adut(dealer_index)
-        log.debug(adut)
-        for talon, player in zip(talons, self.players):
-            player.add_cards(talon)
+        log.debug("Adut is " + repr(adut))
+        self.deal_cards(talons)
+        mi_declarations, vi_declarations = self.compute_declarations(
+            [player.cards for player in self.players], dealer_index
+        )
+        log.debug("MI_DECL: {}".format(mi_declarations))
+        log.debug("VI_DECL: {}".format(vi_declarations))
+        total_points = 162 + sum(t.value() for t in mi_declarations + vi_declarations)
+        log.debug("Total points: {}".format(total_points))
         x = random_gen.randint(0, 162)
         for player in self.players:
             player.clear_cards()
-        return x, 162 - x
+        return x + sum(t.value() for t in mi_declarations), total_points - x
+
+    def deal_cards(self, cards_list: List[List[int]]) -> None:
+        for cards, player in zip(cards_list, self.players):
+            player.add_cards(cards)
+        return
 
     def shuffle(self) -> Tuple[List[List[int]], List[List[int]]]:
         # Usually, cards in Bela are dealed in a particular order
@@ -91,7 +78,7 @@ class Belot:
         return adut_cards, talons
 
     def get_adut(self, dealer_index: int) -> Optional[Suit]:
-        for i in range(1, 1+len(self.players)):  # the dealer calls last
+        for i in range(1, 1 + len(self.players)):  # the dealer calls last
             player_index = (dealer_index + i) % len(self.players)
             log.debug(player_index)
             player = self.players[player_index]
@@ -99,3 +86,41 @@ class Belot:
             if adut != Adut.NEXT:
                 return Suit(adut.value)
         return None
+
+    def compute_declarations(
+        self, player_cards: List[List], dealer_index: int
+    ) -> Tuple[List, List]:
+        declarations_per_player = []
+        for i in range(1, 1 + len(self.players)):  # the dealer calls last
+            player_index = (dealer_index + i) % len(self.players)
+            player_declarations = get_player_declarations(player_cards[player_index])
+            declarations_per_player.append((player_declarations, -(i - 1)))
+        # Here's a trick: we are searching for the best declaration (in terms of points
+        # and general ordering of declarations). But if it so happens that the two players
+        # have the exact same declarations (e.g. both players have a sequence of three cards,
+        # both with highest rank of Ace, but one player has it in, say, Hearts, and the other
+        # in, say, Clubs (the Suit obviously doesn't matter)), then we break the ties with
+        # respect to the order of declaring - the advantage is given to the player that
+        # declares sooner.
+        # PS nested for loop list comprehensions never truly made sense to me
+        all_declarations = [
+            (declaration, player_index)
+            for player_declarations, player_index in declarations_per_player
+            for declaration in player_declarations
+        ]
+        if len(all_declarations) == 0:
+            return [], []
+        best_index = -max(all_declarations)[1]
+        teammate_index = (best_index + 2) % len(declarations_per_player)
+        final_declarations = (
+            declarations_per_player[best_index][0]
+            + declarations_per_player[teammate_index][0]
+        )
+        # if the dealer_index is an even number, the dealer belongs to the team MI
+        # else the dealer belongs to the team VI
+        # in both cases, the dealer's team has a disadvantage which manifests itself
+        # as lack of precedence (explained earlier)
+        if dealer_index % 2 == 0:
+            return [], final_declarations
+        else:
+            return final_declarations, []
