@@ -151,3 +151,44 @@ def test_rank_suit5():
                 assert len(declarations) == 1
                 assert RankDeclaration(the_rank) in declarations
     return
+
+
+def test_declaration_order_rank():
+    for rank1 in VALUES_RANK:
+        for rank2 in VALUES_RANK:
+            assert (rank1.points(adut=True) > rank2.points(adut=True)) == (
+                RankDeclaration(rank1) > RankDeclaration(rank2)
+            )
+    return
+
+
+def test_declaration_order_suit():
+    for length1 in range(3, 8 + 1):
+        ranks1 = list(Rank)[length1 - 1 :]
+        for length2 in range(3, 8 + 1):
+            ranks2 = list(Rank)[length2 - 1 :]
+            for (rank1, rank2) in it.product(ranks1, ranks2):
+                for (suit1, suit2) in it.product(Suit, Suit):
+                    decl1 = SuitDeclaration(rank1, suit1, length1)
+                    decl2 = SuitDeclaration(rank2, suit2, length2)
+                    assert (decl1 > decl2) == (
+                        (length1 > length2) or (length1 == length2 and rank1 > rank2)
+                    )
+    return
+
+
+def test_declarations_order_both():
+    for suit_length in range(3, 8 + 1):
+        suit_ranks = list(Rank)[suit_length - 1 :]
+        for rank_rank in VALUES_RANK:
+            rank_decl = RankDeclaration(rank_rank)
+            for suit_rank in suit_ranks:
+                for suit_suit in Suit:
+                    suit_decl = SuitDeclaration(suit_rank, suit_suit, suit_length)
+                    assert suit_decl != rank_decl
+                    assert (
+                        suit_decl.value() > rank_decl.value() and suit_decl > rank_decl
+                    ) != (
+                        rank_decl.value() >= suit_decl.value() and rank_decl > suit_decl
+                    )
+    return

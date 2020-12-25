@@ -44,9 +44,9 @@ class RankDeclaration(Declaration):
         if self.value() < other.value():
             return True
         elif isinstance(other, SuitDeclaration):
-            return False
+            return other.value == 8
         elif isinstance(other, RankDeclaration):
-            return self.value() < other.value() or self.rank < other.rank
+            return self.rank.points(adut=True) < other.rank.points(adut=True)
         return False
 
     def __eq__(self, other: object) -> bool:
@@ -69,14 +69,16 @@ class SuitDeclaration(Declaration):
         if self.value() < other.value():
             return True
         elif isinstance(other, RankDeclaration):
-            return True
+            return self.length < 8
         elif isinstance(other, SuitDeclaration):
-            return self.value() < other.value() or self.high_rank < other.high_rank
+            return self.length < other.length or (
+                self.length == other.length and self.high_rank < other.high_rank
+            )
         return False
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, SuitDeclaration):
-            return self.high_rank == other.high_rank
+            return self.length == other.length and self.high_rank == other.high_rank
         return False
 
 
