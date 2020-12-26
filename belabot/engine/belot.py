@@ -1,12 +1,13 @@
-from .card import Suit, Adut
+from .card import Suit, Adut, Card
 from .player import Player
 from .declarations import get_player_declarations
+from .util import calculate_points
 
 import logging
 import os
 import random
 import sys
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 random_gen = random.SystemRandom()
 
@@ -37,8 +38,8 @@ class Belot:
     def round(self, dealer_index: int) -> Tuple[int, int]:
         first_6, talons = self.shuffle()
         self.deal_cards(first_6)
-        adut = self.get_adut(dealer_index)
-        log.debug("Adut is " + repr(adut))
+        adut, mi_bid = self.get_adut(dealer_index)
+        log.debug(("MI" if mi_bid else "VI") + " have bid " + repr(adut) + " for adut")
         self.deal_cards(talons)
         mi_declarations, vi_declarations = self.compute_declarations(
             [player.cards for player in self.players], dealer_index
@@ -47,10 +48,26 @@ class Belot:
         log.debug("VI_DECL: {}".format(vi_declarations))
         total_points = 162 + sum(t.value() for t in mi_declarations + vi_declarations)
         log.debug("Total points: {}".format(total_points))
-        x = random_gen.randint(0, 162)
+        mi_points = random_gen.randint(0, 162)
+        log.debug(
+            "MI won "
+            + repr(mi_points)
+            + ", VI won "
+            + repr(162 - mi_points)
+            + " in game."
+        )
+        mi_points, vi_points = calculate_points(
+            mi_points,
+            mi_bid,
+            sum(t.value() for t in mi_declarations),
+            sum(t.value() for t in vi_declarations),
+        )
+        log.debug(
+            "MI won " + repr(mi_points) + ", VI won " + repr(vi_points) + " in total."
+        )
         for player in self.players:
             player.clear_cards()
-        return x + sum(t.value() for t in mi_declarations), total_points - x
+        return mi_points, vi_points
 
     def deal_cards(self, cards_list: List[List[int]]) -> None:
         for cards, player in zip(cards_list, self.players):
@@ -77,18 +94,19 @@ class Belot:
             talons.append(deck[talon_start:player_cards_end])
         return adut_cards, talons
 
-    def get_adut(self, dealer_index: int) -> Optional[Suit]:
+    def get_adut(self, dealer_index: int) -> Tuple[Suit, bool]:
         for i in range(1, 1 + len(self.players)):  # the dealer calls last
             player_index = (dealer_index + i) % len(self.players)
             log.debug(player_index)
             player = self.players[player_index]
             adut = player.get_adut(is_muss=(i == 4))
             if adut != Adut.NEXT:
-                return Suit(adut.value)
-        return None
+                to_return = (Suit(adut.value), player_index % 2 == 0)
+                break
+        return to_return
 
     def compute_declarations(
-        self, player_cards: List[List], dealer_index: int
+        self, player_cards: List[List[Card]], dealer_index: int
     ) -> Tuple[List, List]:
         declarations_per_player = []
         for i in range(1, 1 + len(self.players)):  # the dealer calls last
