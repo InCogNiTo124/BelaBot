@@ -7,6 +7,7 @@ import logging
 import os
 import random
 import sys
+from functools import reduce
 from typing import List, Tuple
 
 random_gen = random.SystemRandom()
@@ -16,10 +17,15 @@ log.addHandler(logging.StreamHandler(sys.stdout))
 log.setLevel(os.environ.get("BB_LOGLEVEL", "INFO").upper())
 
 
+   
+
 class Belot:
     def __init__(self, players: List[Player]):
         self.players = players
         self.deck = range(32)
+        self.cards_played: List[Card] = []
+        self.mi = slice(0, None, 2)
+        self.vi = slice(1, None, 2)
         return
 
     def play(self) -> None:
@@ -36,6 +42,7 @@ class Belot:
         return
 
     def round(self, dealer_index: int) -> Tuple[int, int]:
+        ### BIDDING PHASE
         first_6, talons = self.shuffle()
         self.deal_cards(first_6)
         adut, mi_bid = self.get_adut(dealer_index)
@@ -48,23 +55,39 @@ class Belot:
         log.debug("VI_DECL: {}".format(vi_declarations))
         total_points = 162 + sum(t.value() for t in mi_declarations + vi_declarations)
         log.debug("Total points: {}".format(total_points))
-        mi_points = random_gen.randint(0, 162)
-        log.debug(
-            "MI won "
-            + repr(mi_points)
-            + ", VI won "
-            + repr(162 - mi_points)
-            + " in game."
-        )
+
+        ### MAIN PHASE
+        # mi_points = random_gen.randint(0, 162)
+        mi_points, vi_points = 0, 0
+        # next player starts first
+        start_player_index = (dealer_index + 1) % len(self.players)
+        turn_cards: List[Card] = []
+        for turn in range(8):
+            for i in range(4):
+                player_index = (start_player_index + i) % 4
+                player = self.players[player_index]
+                card = player.play_card(turn_cards)   # reinforcement learning step
+                assert is_valid_move(turn_cards, card, player.cards)
+                turn_cards.append(card)
+                self.notify_played(player, card)
+            assert len(turn_cards[self.mi]) == 2
+            assert len(turn_cards[self.vi]) == 2
+            assert turn_cards[self.mi] != turn_cards[self.vi]
+            mi_turn = sum(card.points(card.suit == adut) for card in turn_cards[self.mi])
+            vi_turn = sum(card.points(card.suit == adut) for card in turn_cards[self.vi])
+            mi_points += mi_turn
+            vi_points += vi_turn
+            turn_cards.clear()
+        mi_points += 10
+        assert (mi_points + vi_points) == 162
+        log.debug(f"MI won {repr(mi_points)}, VI won {repr(162 - mi_points)} in game.")
         mi_points, vi_points = calculate_points(
             mi_points,
             mi_bid,
             sum(t.value() for t in mi_declarations),
             sum(t.value() for t in vi_declarations),
         )
-        log.debug(
-            "MI won " + repr(mi_points) + ", VI won " + repr(vi_points) + " in total."
-        )
+        log.debug(f"MI won {repr(mi_points)}, VI won {repr(vi_points)} in total.")
         for player in self.players:
             player.clear_cards()
         return mi_points, vi_points
@@ -72,6 +95,12 @@ class Belot:
     def deal_cards(self, cards_list: List[List[int]]) -> None:
         for cards, player in zip(cards_list, self.players):
             player.add_cards(cards)
+        return
+
+    def notify_played(self, player: Player, card: Card) -> None:
+        for other_player in self.players:
+            if other_player != player:
+                other_player.notify_played(card)
         return
 
     def shuffle(self) -> Tuple[List[List[int]], List[List[int]]]:
@@ -113,7 +142,7 @@ class Belot:
             player_index = (dealer_index + i) % len(self.players)
             player_declarations = get_player_declarations(player_cards[player_index])
             declarations_per_player.append((player_declarations, -(i - 1)))
-        # Here's a trick: we are searching for the best declaration (in terms of points
+        # Here's the trick: we are searching for the best declaration (in terms of points
         # and general ordering of declarations). But if it so happens that the two players
         # have the exact same declarations (e.g. both players have a sequence of three cards,
         # both with highest rank of Ace, but one player has it in, say, Hearts, and the other
@@ -126,9 +155,10 @@ class Belot:
             for player_declarations, player_index in declarations_per_player
             for declaration in player_declarations
         ]
+        print(all_declarations)
         if len(all_declarations) == 0:
             return [], []
-        best_index = -max(all_declarations)[1]
+        best_index = -max(all_declarations)[1]  # declarations are comparable
         teammate_index = (best_index + 2) % len(declarations_per_player)
         final_declarations = (
             declarations_per_player[best_index][0]

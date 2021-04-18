@@ -1,4 +1,6 @@
-from typing import Tuple
+from typing import Tuple, List
+from .card import Card
+from .player import Player
 
 DECK_TOTAL = 162
 STIGLJA_PENALTY = 90
@@ -24,3 +26,9 @@ def calculate_points(
             return mi_points, vi_points
         else:
             return mi_points + vi_points, 0
+
+def is_valid_move(turn_cards: List[Card], card: Card, player: Player) -> bool:
+    if len(turn_cards) == 0:
+        # first card is always a valid move
+        return True
+
