@@ -64,7 +64,7 @@ class Belot:
             for i in range(4):
                 player_index = (start_player_index + i) % 4
                 player = self.players[player_index]
-                card = player.play_card(turn_cards)  # reinforcement learning step
+                card = player.play_card(turn_cards, adut)  # reinforcement learning step
                 assert card in get_valid_moves(turn_cards, player.cards, adut)
                 turn_cards.append(card)
                 self.notify_played(player, card)
@@ -97,7 +97,9 @@ class Belot:
 
     def notify_played(self, player: Player, card: Card) -> None:
         for other_player in self.players:
-            if other_player != player:
+            if other_player == player:
+                player.card_accepted(card)
+            else:
                 other_player.notify_played(card)
         return
 

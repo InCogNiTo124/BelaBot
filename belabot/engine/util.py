@@ -1,6 +1,5 @@
 from typing import Tuple, List
 from .card import Card, Suit
-from .player import Player
 
 DECK_TOTAL = 162
 STIGLJA_PENALTY = 90
