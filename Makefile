@@ -4,7 +4,7 @@
 check: test type
 
 test:
-	pytest tests/
+	pytest -v tests/
 
 type:
 	mypy .
