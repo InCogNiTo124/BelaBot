@@ -1,4 +1,5 @@
-from belabot.engine.util import calculate_points
+from belabot.engine.util import calculate_points, get_valid_moves
+from belabot.engine.card import Card, Suit, Rank
 
 
 def test_calculate_points_no_decl():
@@ -37,3 +38,66 @@ def test_calculate_points_stiglja():
     assert calculate_points(0, False, 0, 50) == (0, 302)
     assert calculate_points(0, True, 20, 50) == (0, 322)
     assert calculate_points(0, False, 20, 50) == (0, 322)
+
+
+def test_valid_moves():
+    player_cards = [
+        Card(Rank.KING, Suit.HEARTS),
+        Card(Rank.X, Suit.HEARTS),
+        Card(Rank.QUEEN, Suit.HEARTS),
+        Card(Rank.QUEEN, Suit.SPADES),
+        Card(Rank.ACE, Suit.SPADES),
+        Card(Rank.VII, Suit.SPADES),
+        Card(Rank.KING, Suit.CLUBS),
+        Card(Rank.VIII, Suit.CLUBS),
+    ]
+    for suit in Suit:
+        assert get_valid_moves([], player_cards, suit) == player_cards
+    for suit in [Suit.HEARTS, Suit.DIAMONDS, Suit.CLUBS]:
+        assert get_valid_moves([Card(Rank.VIII, Suit.SPADES)], player_cards, suit) == [
+            Card(Rank.QUEEN, Suit.SPADES),
+            Card(Rank.ACE, Suit.SPADES),
+        ]
+        assert get_valid_moves([Card(Rank.KING, Suit.SPADES)], player_cards, suit) == [
+            Card(Rank.ACE, Suit.SPADES)
+        ]
+
+    assert get_valid_moves([Card(Rank.VII, Suit.CLUBS)], player_cards, Suit.CLUBS) == [
+        Card(Rank.KING, Suit.CLUBS),
+        Card(Rank.VIII, Suit.CLUBS),
+    ]
+    assert get_valid_moves(
+        [Card(Rank.QUEEN, Suit.CLUBS)], player_cards, Suit.CLUBS
+    ) == [Card(Rank.KING, Suit.CLUBS)]
+    assert get_valid_moves([Card(Rank.IX, Suit.CLUBS)], player_cards, Suit.CLUBS) == [
+        Card(Rank.KING, Suit.CLUBS),
+        Card(Rank.VIII, Suit.CLUBS),
+    ]
+
+    for rank in Rank:
+        assert get_valid_moves(
+            [Card(rank, Suit.DIAMONDS)], player_cards, Suit.HEARTS
+        ) == [
+            Card(Rank.KING, Suit.HEARTS),
+            Card(Rank.X, Suit.HEARTS),
+            Card(Rank.QUEEN, Suit.HEARTS),
+        ]
+        assert get_valid_moves(
+            [Card(rank, Suit.DIAMONDS)], player_cards, Suit.SPADES
+        ) == [
+            Card(Rank.QUEEN, Suit.SPADES),
+            Card(Rank.ACE, Suit.SPADES),
+            Card(Rank.VII, Suit.SPADES),
+        ]
+        assert get_valid_moves(
+            [Card(rank, Suit.DIAMONDS)], player_cards, Suit.CLUBS
+        ) == [Card(Rank.KING, Suit.CLUBS), Card(Rank.VIII, Suit.CLUBS)]
+
+        assert (
+            get_valid_moves([Card(rank, Suit.DIAMONDS)], player_cards, Suit.DIAMONDS)
+            == player_cards
+        )
+
+    ###
+    # TODO repeat with multiple cards
+    return

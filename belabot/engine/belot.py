@@ -1,7 +1,7 @@
 from .card import Suit, Adut, Card
 from .player import Player
 from .declarations import get_player_declarations
-from .util import calculate_points
+from .util import calculate_points, get_valid_moves
 
 import logging
 import os
@@ -16,8 +16,6 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.StreamHandler(sys.stdout))
 log.setLevel(os.environ.get("BB_LOGLEVEL", "INFO").upper())
 
-
-   
 
 class Belot:
     def __init__(self, players: List[Player]):
@@ -66,15 +64,15 @@ class Belot:
             for i in range(4):
                 player_index = (start_player_index + i) % 4
                 player = self.players[player_index]
-                card = player.play_card(turn_cards)   # reinforcement learning step
-                assert is_valid_move(turn_cards, card, player.cards)
+                card = player.play_card(turn_cards)  # reinforcement learning step
+                assert card in get_valid_moves(turn_cards, player.cards, adut)
                 turn_cards.append(card)
                 self.notify_played(player, card)
             assert len(turn_cards[self.mi]) == 2
             assert len(turn_cards[self.vi]) == 2
             assert turn_cards[self.mi] != turn_cards[self.vi]
-            mi_turn = sum(card.points(card.suit == adut) for card in turn_cards[self.mi])
-            vi_turn = sum(card.points(card.suit == adut) for card in turn_cards[self.vi])
+            mi_turn = sum(card.points(adut) for card in turn_cards[self.mi])
+            vi_turn = sum(card.points(adut) for card in turn_cards[self.vi])
             mi_points += mi_turn
             vi_points += vi_turn
             turn_cards.clear()

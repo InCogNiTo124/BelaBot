@@ -109,8 +109,8 @@ class Card:
     def to_int(self: "Card") -> int:
         return (self.suit.value - 1) * len(Rank) + self.rank.value - 1
 
-    def points(self: "Card", adut: bool) -> int:
-        return self.rank.points(adut)
+    def points(self: "Card", adut: Suit) -> int:
+        return self.rank.points(self.suit == adut)
 
     def __repr__(self: "Card") -> str:
         return f"{repr(self.rank)} {repr(self.suit)}"
