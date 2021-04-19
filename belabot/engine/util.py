@@ -28,9 +28,18 @@ def calculate_points(
             return mi_points + vi_points, 0
 
 
+def is_uber(uber: Card, card: Card, adut: Suit) -> bool:
+    return (
+        uber.points(adut) > card.points(adut)
+        or uber.points(adut) == card.points(adut)
+        and uber > card
+    )
+
+
 def get_valid_moves(
     turn_cards: List[Card], player_cards: List[Card], adut: Suit
 ) -> List[Card]:
+    # print(adut)
     if len(turn_cards) == 0:
         # first card is always a valid move
         return player_cards
@@ -40,17 +49,21 @@ def get_valid_moves(
     if len(cards_in_suit) > 0:
         # The player has at least one card matching the suit of the first card
         # It is, then, determined if a player has a card that is of greater value
+        if (
+            first_card.suit != adut
+            and sum(1 for card in turn_cards if card.suit == adut) > 0
+        ):
+            # adut is played, so the player does not have to play uber
+            return cards_in_suit
         strongest_card = max(
             card for card in turn_cards if card.suit == first_card.suit
         )
+        # print(strongest_card)
         uber_cards = [
-            card
-            for card in cards_in_suit
-            if card.points(adut) >= strongest_card.points(adut)
-            and card > strongest_card
+            card for card in cards_in_suit if is_uber(card, strongest_card, adut)
         ]
+        # print(uber_cards)
         return uber_cards if len(uber_cards) > 0 else cards_in_suit
-        # TODO if adut is played, the player doesn't have to play uber card
 
     # The player doesn't have any cards which match the first card's suit.
     # Therefore, the player must play an adut, if possible
@@ -61,12 +74,11 @@ def get_valid_moves(
         if len(turn_aduts) > 0:
             # some aduts have been played. The player must play an uber adut, if possible
             strongest_adut = max(turn_aduts)
+            # print(strongest_adut)
             uber_aduts = [
-                card
-                for card in player_aduts
-                if card.points(adut) >= strongest_adut.points(adut)
-                and card > strongest_adut
+                card for card in player_aduts if is_uber(card, strongest_adut, adut)
             ]
+            # print(uber_aduts)
             return uber_aduts if len(uber_aduts) > 0 else player_aduts
 
         # There are no aduts played. Player can play whatever adut

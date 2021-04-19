@@ -42,7 +42,7 @@ def test_calculate_points_stiglja():
 
 def test_valid_moves():
     player_cards = [
-        Card(Rank.KING, Suit.HEARTS),
+        Card(Rank.IX, Suit.HEARTS),
         Card(Rank.X, Suit.HEARTS),
         Card(Rank.QUEEN, Suit.HEARTS),
         Card(Rank.QUEEN, Suit.SPADES),
@@ -53,6 +53,7 @@ def test_valid_moves():
     ]
     for suit in Suit:
         assert get_valid_moves([], player_cards, suit) == player_cards
+
     for suit in [Suit.HEARTS, Suit.DIAMONDS, Suit.CLUBS]:
         assert get_valid_moves([Card(Rank.VIII, Suit.SPADES)], player_cards, suit) == [
             Card(Rank.QUEEN, Suit.SPADES),
@@ -78,7 +79,7 @@ def test_valid_moves():
         assert get_valid_moves(
             [Card(rank, Suit.DIAMONDS)], player_cards, Suit.HEARTS
         ) == [
-            Card(Rank.KING, Suit.HEARTS),
+            Card(Rank.IX, Suit.HEARTS),
             Card(Rank.X, Suit.HEARTS),
             Card(Rank.QUEEN, Suit.HEARTS),
         ]
@@ -98,6 +99,68 @@ def test_valid_moves():
             == player_cards
         )
 
-    ###
-    # TODO repeat with multiple cards
+    ### two cards
+    # uber cards without adut
+    for adut_suit in [Suit.DIAMONDS, Suit.SPADES, Suit.CLUBS]:
+        assert (
+            get_valid_moves(
+                [Card(Rank.JACK, Suit.HEARTS), Card(Rank.VIII, Suit.HEARTS)],
+                player_cards,
+                adut_suit,
+            )
+            == [Card(Rank.X, Suit.HEARTS), Card(Rank.QUEEN, Suit.HEARTS)]
+        )
+        assert (
+            get_valid_moves(
+                [Card(Rank.JACK, Suit.HEARTS), Card(Rank.KING, Suit.HEARTS)],
+                player_cards,
+                adut_suit,
+            )
+            == [Card(Rank.X, Suit.HEARTS)]
+        )
+
+    # cutting
+    for adut_suit in [Suit.DIAMONDS, Suit.SPADES, Suit.CLUBS]:
+        assert get_valid_moves(
+            [Card(Rank.JACK, Suit.HEARTS), Card(Rank.JACK, adut_suit)],
+            player_cards,
+            adut_suit,
+        ) == [
+            Card(Rank.IX, Suit.HEARTS),
+            Card(Rank.X, Suit.HEARTS),
+            Card(Rank.QUEEN, Suit.HEARTS),
+        ]
+
+    # no color
+    assert get_valid_moves(
+        [Card(Rank.QUEEN, Suit.DIAMONDS), Card(Rank.IX, Suit.DIAMONDS)],
+        player_cards,
+        Suit.SPADES,
+    ) == [
+        Card(Rank.QUEEN, Suit.SPADES),
+        Card(Rank.ACE, Suit.SPADES),
+        Card(Rank.VII, Suit.SPADES),
+    ]
+
+    # second card is a filter for aduts
+    assert get_valid_moves(
+        [Card(Rank.QUEEN, Suit.DIAMONDS), Card(Rank.VIII, Suit.SPADES)],
+        player_cards,
+        Suit.SPADES,
+    ) == [Card(Rank.QUEEN, Suit.SPADES), Card(Rank.ACE, Suit.SPADES)]
+    assert get_valid_moves(
+        [Card(Rank.QUEEN, Suit.DIAMONDS), Card(Rank.X, Suit.SPADES)],
+        player_cards,
+        Suit.SPADES,
+    ) == [Card(Rank.ACE, Suit.SPADES)]
+    assert get_valid_moves(
+        [Card(Rank.QUEEN, Suit.DIAMONDS), Card(Rank.IX, Suit.SPADES)],
+        player_cards,
+        Suit.SPADES,
+    ) == [
+        Card(Rank.QUEEN, Suit.SPADES),
+        Card(Rank.ACE, Suit.SPADES),
+        Card(Rank.VII, Suit.SPADES),
+    ]
+
     return
