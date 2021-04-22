@@ -48,6 +48,7 @@ class Player(abc.ABC):
     def play_card(self, turn_cards: List[Card]) -> Card:
         pass
 
+
 class RandomPlayer(Player):
     def get_adut(self, is_muss: bool) -> Adut:
         log.debug("\t" + repr(self.cards))

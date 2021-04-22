@@ -1,7 +1,7 @@
 from .card import Suit, Adut, Card
 from .player import Player
 from .declarations import get_player_declarations
-from .util import calculate_points, get_valid_moves
+from .util import calculate_points, get_valid_moves, get_winner
 
 import logging
 import os
@@ -44,7 +44,7 @@ class Belot:
         first_6, talons = self.shuffle()
         self.deal_cards(first_6)
         adut, mi_bid = self.get_adut(dealer_index)
-        log.debug(("MI" if mi_bid else "VI") + " have bid " + repr(adut) + " for adut")
+        log.debug(f'{"MI" if mi_bid else "VI"} have bid {repr(adut)} for adut')
         self.deal_cards(talons)
         mi_declarations, vi_declarations = self.compute_declarations(
             [player.cards for player in self.players], dealer_index
@@ -66,17 +66,25 @@ class Belot:
                 player = self.players[player_index]
                 card = player.play_card(turn_cards, adut)  # reinforcement learning step
                 assert card in get_valid_moves(turn_cards, player.cards, adut)
+                log.debug(f"\t{player.name} plays {repr(card)}")
                 turn_cards.append(card)
                 self.notify_played(player, card)
-            assert len(turn_cards[self.mi]) == 2
-            assert len(turn_cards[self.vi]) == 2
+            #assert len(turn_cards[self.mi]) == 2
+            #assert len(turn_cards[self.vi]) == 2
             assert turn_cards[self.mi] != turn_cards[self.vi]
-            mi_turn = sum(card.points(adut) for card in turn_cards[self.mi])
-            vi_turn = sum(card.points(adut) for card in turn_cards[self.vi])
+            turn_winner = get_winner(turn_cards, adut)
+            log.debug(f'{turn_winner} wins the turn.')
+            if (start_player_index + turn_winner) % 4 == 0:
+                mi_turn = sum(card.points(adut) for card in turn_cards) + (10 if turn == 7 else 0)
+                vi_turn = 0
+            else:
+                mi_turn = 0
+                vi_turn = sum(card.points(adut) for card in turn_cards) + (10 if turn == 7 else 0)
+            log.debug(f'mi_turn: {mi_turn}\tvi_turn: {vi_turn}')
             mi_points += mi_turn
             vi_points += vi_turn
+            start_player_index = (start_player_index + turn_winner) % len(self.players)
             turn_cards.clear()
-        mi_points += 10
         assert (mi_points + vi_points) == 162
         log.debug(f"MI won {repr(mi_points)}, VI won {repr(162 - mi_points)} in game.")
         mi_points, vi_points = calculate_points(
@@ -126,7 +134,7 @@ class Belot:
     def get_adut(self, dealer_index: int) -> Tuple[Suit, bool]:
         for i in range(1, 1 + len(self.players)):  # the dealer calls last
             player_index = (dealer_index + i) % len(self.players)
-            log.debug(player_index)
+            log.debug(f"Player {player_index} bids...")
             player = self.players[player_index]
             adut = player.get_adut(is_muss=(i == 4))
             if adut != Adut.NEXT:

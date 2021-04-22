@@ -1,5 +1,6 @@
-from belabot.engine.util import calculate_points, get_valid_moves
+from belabot.engine.util import calculate_points, get_valid_moves, get_winner
 from belabot.engine.card import Card, Suit, Rank
+from functools import cmp_to_key
 
 
 def test_calculate_points_no_decl():
@@ -143,16 +144,22 @@ def test_valid_moves():
     ]
 
     # second card is a filter for aduts
-    assert get_valid_moves(
-        [Card(Rank.QUEEN, Suit.DIAMONDS), Card(Rank.VIII, Suit.SPADES)],
-        player_cards,
-        Suit.SPADES,
-    ) == [Card(Rank.QUEEN, Suit.SPADES), Card(Rank.ACE, Suit.SPADES)]
-    assert get_valid_moves(
-        [Card(Rank.QUEEN, Suit.DIAMONDS), Card(Rank.X, Suit.SPADES)],
-        player_cards,
-        Suit.SPADES,
-    ) == [Card(Rank.ACE, Suit.SPADES)]
+    assert (
+        get_valid_moves(
+            [Card(Rank.QUEEN, Suit.DIAMONDS), Card(Rank.VIII, Suit.SPADES)],
+            player_cards,
+            Suit.SPADES,
+        )
+        == [Card(Rank.QUEEN, Suit.SPADES), Card(Rank.ACE, Suit.SPADES)]
+    )
+    assert (
+        get_valid_moves(
+            [Card(Rank.QUEEN, Suit.DIAMONDS), Card(Rank.X, Suit.SPADES)],
+            player_cards,
+            Suit.SPADES,
+        )
+        == [Card(Rank.ACE, Suit.SPADES)]
+    )
     assert get_valid_moves(
         [Card(Rank.QUEEN, Suit.DIAMONDS), Card(Rank.IX, Suit.SPADES)],
         player_cards,
@@ -162,5 +169,64 @@ def test_valid_moves():
         Card(Rank.ACE, Suit.SPADES),
         Card(Rank.VII, Suit.SPADES),
     ]
+
+    return
+
+
+def test_get_winner():
+    # all cards same suit, suit not adut
+    for suit in [Suit.DIAMONDS, Suit.SPADES, Suit.CLUBS]:
+        assert (
+            get_winner(
+                [
+                    Card(Rank.QUEEN, Suit.HEARTS),
+                    Card(Rank.KING, Suit.HEARTS),
+                    Card(Rank.ACE, Suit.HEARTS),
+                    Card(Rank.JACK, Suit.HEARTS),
+                ],
+                suit,
+            )
+            == 2
+        )
+
+    # all cards same, suit is adut
+    assert (
+        get_winner(
+            [
+                Card(Rank.QUEEN, Suit.HEARTS),
+                Card(Rank.KING, Suit.CLUBS),
+                Card(Rank.ACE, Suit.CLUBS),
+                Card(Rank.JACK, Suit.CLUBS),
+            ],
+            Suit.SPADES,
+        )
+        == 0
+    )
+
+    # adut
+    assert (
+        get_winner(
+            [
+                Card(Rank.QUEEN, Suit.HEARTS),
+                Card(Rank.VII, Suit.SPADES),
+                Card(Rank.ACE, Suit.CLUBS),
+                Card(Rank.ACE, Suit.HEARTS),
+            ],
+            Suit.SPADES,
+        )
+        == 1
+    )
+    assert (
+        get_winner(
+            [
+                Card(Rank.QUEEN, Suit.HEARTS),
+                Card(Rank.VII, Suit.SPADES),
+                Card(Rank.VIII, Suit.SPADES),
+                Card(Rank.ACE, Suit.HEARTS),
+            ],
+            Suit.SPADES,
+        )
+        == 2
+    )
 
     return

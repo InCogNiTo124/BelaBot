@@ -1,5 +1,6 @@
-from typing import Tuple, List
+from typing import Tuple, List, Iterable, Callable, Optional
 from .card import Card, Suit
+from functools import cmp_to_key
 
 DECK_TOTAL = 162
 STIGLJA_PENALTY = 90
@@ -86,3 +87,29 @@ def get_valid_moves(
         # The player does not have neither matching suit nor an adut.
         # Therefore, the player can choose whatever card
         return player_cards
+
+
+def argmax(iterable: Iterable, key: Optional[Callable] = None) -> int:
+    f = None
+    if key is not None:
+        f = lambda i: key(iterable[i])
+    return max(range(len(iterable)), key=f)
+
+
+def get_winner(turn_cards: List[Card], adut_suit: Suit) -> int:
+    assert len(turn_cards) == 4
+    strongest = None
+    uber_key = cmp_to_key(lambda a, b: 2 * int(is_uber(a, b, adut_suit)) - 1)
+    first_card = turn_cards[0]
+    played_aduts = [card for card in turn_cards if card.suit == adut_suit]
+    if len(played_aduts) > 0:
+        strongest = max(
+            played_aduts, key=lambda card: (card.points(adut_suit), uber_key(card))
+        )
+    else:
+        cards_in_suit = [card for card in turn_cards if card.suit == first_card.suit]
+        if len(cards_in_suit) > 0:
+            strongest = max(
+                cards_in_suit, key=lambda card: (card.points(adut_suit), uber_key(card))
+            )
+    return turn_cards.index(strongest)
