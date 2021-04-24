@@ -8,7 +8,7 @@ import os
 import random
 import sys
 from functools import reduce
-from typing import List, Tuple
+from typing import List, Tuple, Sequence
 
 random_gen = random.SystemRandom()
 
@@ -18,7 +18,7 @@ log.setLevel(os.environ.get("BB_LOGLEVEL", "INFO").upper())
 
 
 class Belot:
-    def __init__(self, players: List[Player]):
+    def __init__(self, players: Sequence[Player]):
         self.players = players
         self.deck = range(32)
         self.cards_played: List[Card] = []
@@ -74,13 +74,14 @@ class Belot:
             assert turn_cards[self.mi] != turn_cards[self.vi]
             turn_winner = get_winner(turn_cards, adut)
             log.debug(f'{turn_winner} wins the turn.')
-            if (start_player_index + turn_winner) % 4 == 0:
+            if (start_player_index + turn_winner) % 2 == 0:
                 mi_turn = sum(card.points(adut) for card in turn_cards) + (10 if turn == 7 else 0)
                 vi_turn = 0
             else:
                 mi_turn = 0
                 vi_turn = sum(card.points(adut) for card in turn_cards) + (10 if turn == 7 else 0)
             log.debug(f'mi_turn: {mi_turn}\tvi_turn: {vi_turn}')
+            self.notify_turn_points(mi_turn, vi_turn)
             mi_points += mi_turn
             vi_points += vi_turn
             start_player_index = (start_player_index + turn_winner) % len(self.players)
@@ -109,6 +110,11 @@ class Belot:
                 player.card_accepted(card)
             else:
                 other_player.notify_played(card)
+        return
+
+    def notify_turn_points(self, mi_points: int, vi_points: int) -> None:
+        for i, player in enumerate(self.players):
+            player.notify_turn_points(mi_points if i % 2 == 0 else vi_points)
         return
 
     def shuffle(self) -> Tuple[List[List[int]], List[List[int]]]:

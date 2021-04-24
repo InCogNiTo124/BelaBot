@@ -18,6 +18,7 @@ class Player(abc.ABC):
         self.name: Optional[str] = name
         self.cards: List[Card] = []
         self.played: List[Card] = []
+        self.points: List[int] = []
         return
 
     def add_cards(self, cards: List[int]) -> None:
@@ -40,12 +41,16 @@ class Player(abc.ABC):
     def card_played(self, card: Card) -> None:
         return
 
+    def notify_turn_points(self, points: int) -> None:
+        self.points.append(points)
+        return
+
     @abc.abstractmethod
     def get_adut(self, is_muss: bool) -> Adut:
         pass
 
     @abc.abstractmethod
-    def play_card(self, turn_cards: List[Card]) -> Card:
+    def play_card(self, turn_cards: List[Card], adut_suit: Suit) -> Card:
         pass
 
 
