@@ -91,7 +91,7 @@ def get_valid_moves(
 
 def get_winner(turn_cards: List[Card], adut_suit: Suit) -> int:
     assert len(turn_cards) == 4
-    strongest = Card.from_int(0) # just the default value
+    strongest = Card.from_int(0)  # just the default value
     uber_key: Callable = cmp_to_key(lambda a, b: 2 * int(is_uber(a, b, adut_suit)) - 1)
     first_card = turn_cards[0]
     played_aduts = [card for card in turn_cards if card.suit == adut_suit]

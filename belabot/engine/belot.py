@@ -69,18 +69,22 @@ class Belot:
                 log.debug(f"\t{player.name} plays {repr(card)}")
                 turn_cards.append(card)
                 self.notify_played(player, card)
-            #assert len(turn_cards[self.mi]) == 2
-            #assert len(turn_cards[self.vi]) == 2
+            # assert len(turn_cards[self.mi]) == 2
+            # assert len(turn_cards[self.vi]) == 2
             assert turn_cards[self.mi] != turn_cards[self.vi]
             turn_winner = get_winner(turn_cards, adut)
-            log.debug(f'{turn_winner} wins the turn.')
+            log.debug(f"{turn_winner} wins the turn.")
             if (start_player_index + turn_winner) % 2 == 0:
-                mi_turn = sum(card.points(adut) for card in turn_cards) + (10 if turn == 7 else 0)
+                mi_turn = sum(card.points(adut) for card in turn_cards) + (
+                    10 if turn == 7 else 0
+                )
                 vi_turn = 0
             else:
                 mi_turn = 0
-                vi_turn = sum(card.points(adut) for card in turn_cards) + (10 if turn == 7 else 0)
-            log.debug(f'mi_turn: {mi_turn}\tvi_turn: {vi_turn}')
+                vi_turn = sum(card.points(adut) for card in turn_cards) + (
+                    10 if turn == 7 else 0
+                )
+            log.debug(f"mi_turn: {mi_turn}\tvi_turn: {vi_turn}")
             self.notify_turn_points(mi_turn, vi_turn)
             mi_points += mi_turn
             vi_points += vi_turn
