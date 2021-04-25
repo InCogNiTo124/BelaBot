@@ -1,12 +1,14 @@
+import itertools as it
+
+import more_itertools as mit
+
+from belabot.engine.card import Card, Rank, Suit
 from belabot.engine.declarations import (
-    get_player_declarations,
+    VALUES_RANK,
     RankDeclaration,
     SuitDeclaration,
-    VALUES_RANK,
+    get_player_declarations,
 )
-from belabot.engine.card import Card, Suit, Rank
-import itertools as it
-import more_itertools as mit
 
 
 def test_single_suit_declaration():
@@ -164,9 +166,9 @@ def test_declaration_order_rank():
 
 def test_declaration_order_suit():
     for length1 in range(3, 8 + 1):
-        ranks1 = list(Rank)[length1-1:]
+        ranks1 = list(Rank)[length1 - 1:]
         for length2 in range(3, 8 + 1):
-            ranks2 = list(Rank)[length2-1:]
+            ranks2 = list(Rank)[length2 - 1:]
             for (rank1, rank2) in it.product(ranks1, ranks2):
                 for (suit1, suit2) in it.product(Suit, Suit):
                     decl1 = SuitDeclaration(rank1, suit1, length1)
@@ -179,7 +181,7 @@ def test_declaration_order_suit():
 
 def test_declarations_order_both():
     for suit_length in range(3, 8 + 1):
-        suit_ranks = list(Rank)[suit_length-1:]
+        suit_ranks = list(Rank)[suit_length - 1:]
         for rank_rank in VALUES_RANK:
             rank_decl = RankDeclaration(rank_rank)
             for suit_rank in suit_ranks:

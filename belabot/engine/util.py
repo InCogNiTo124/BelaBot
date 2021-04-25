@@ -1,9 +1,17 @@
-from typing import Tuple, List, Callable
-from .card import Card, Suit
 from functools import cmp_to_key
+from typing import Callable, List, Tuple
+
+from .card import Card, Suit
 
 DECK_TOTAL = 162
 STIGLJA_PENALTY = 90
+
+
+def one_hot_encode(i: int, length: int) -> List[int]:
+    """One-Hot encode a number from available numbers
+    0 gets encoded as (length-1) dimensional list of 0's.
+    any other number gets encoded as a 1 at (i-1)'th place"""
+    return [1 if j == i else 0 for j in range(1, length)]
 
 
 def calculate_points(

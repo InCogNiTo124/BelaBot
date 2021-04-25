@@ -1,14 +1,15 @@
-from .card import Suit, Adut, Card
-from .player import Player
-from .declarations import Declaration, get_player_declarations
-from .util import calculate_points, get_valid_moves, get_winner
-
 import logging
 import os
 import random
 import sys
-from typing import List, Tuple, Sequence, Dict
+from typing import Dict, List, Sequence, Tuple
+
 import more_itertools as mit
+
+from .card import Adut, Card, Suit
+from .declarations import Declaration, get_player_declarations
+from .player import Player
+from .util import calculate_points, get_valid_moves, get_winner
 
 random_gen = random.SystemRandom()
 
@@ -63,7 +64,11 @@ class Belot:
         total_points = 162 + sum(t.value() for t in mi_declarations + vi_declarations)
         log.debug("Total points: {}".format(total_points))
 
-        self.notify_pregame(all_declarations, adut, adut_caller_index)
+        self.notify_pregame(
+            {self.players[key]: value for key, value in all_declarations.items()},
+            adut,
+            adut_caller_index,
+        )
 
         # MAIN PHASE
         # mi_points = random_gen.randint(0, 162)
@@ -130,7 +135,10 @@ class Belot:
         return
 
     def notify_pregame(
-        self, declarations: Dict[int, List[Declaration]], adut: Suit, adut_caller: int
+        self,
+        declarations: Dict[Player, List[Declaration]],
+        adut: Suit,
+        adut_caller: int,
     ) -> None:
         for player in self.players:
             player.notify_pregame(declarations, adut, self.players[adut_caller])

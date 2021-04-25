@@ -1,5 +1,10 @@
-from belabot.engine.util import calculate_points, get_valid_moves, get_winner
-from belabot.engine.card import Card, Suit, Rank
+from belabot.engine.card import Card, Rank, Suit
+from belabot.engine.util import (
+    calculate_points,
+    get_valid_moves,
+    get_winner,
+    one_hot_encode,
+)
 
 
 def test_calculate_points_no_decl():
@@ -228,4 +233,17 @@ def test_get_winner():
         == 2
     )
 
+    return
+
+
+def test_one_hot_encode():
+    for length in range(2, 100):
+        for i in range(length):
+            enc = one_hot_encode(i, length)
+            assert len(enc) == length - 1
+            if i == 0:
+                assert sum(enc) == 0
+            else:
+                assert sum(enc) == 1
+                assert enc[i - 1] == 1
     return

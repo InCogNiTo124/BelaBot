@@ -1,5 +1,6 @@
-from belabot.engine.card import Card, Rank, Suit
 import itertools as it
+
+from belabot.engine.card import Card, Rank, Suit
 
 
 def test_card():

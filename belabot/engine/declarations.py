@@ -1,10 +1,11 @@
 import abc
-from .card import Card, Rank, Suit
-from typing import cast, List, MutableSequence, Sequence, Set, Tuple
-import more_itertools as mit
 import dataclasses
 from functools import total_ordering
+from typing import List, MutableSequence, Sequence, Set, Tuple, cast
 
+import more_itertools as mit
+
+from .card import Card, Rank, Suit
 
 VALUES_SEQUENCE = {0: 0, 1: 0, 2: 0, 3: 20, 4: 50, 5: 100, 6: 100, 7: 100, 8: 1000}
 
@@ -31,6 +32,9 @@ class Declaration:
     def __eq__(self, other: object) -> bool:
         pass
 
+    def cards(self) -> List[Card]:
+        return []
+
 
 @dataclasses.dataclass
 class RankDeclaration(Declaration):
@@ -44,7 +48,7 @@ class RankDeclaration(Declaration):
         if self.value() < other.value():
             return True
         elif isinstance(other, SuitDeclaration):
-            return other.value == 8
+            return other.value() == 8
         elif isinstance(other, RankDeclaration):
             return self.rank.points(adut=True) < other.rank.points(adut=True)
         return False
@@ -53,6 +57,9 @@ class RankDeclaration(Declaration):
         if isinstance(other, RankDeclaration):
             return self.rank == other.rank
         return False
+
+    def cards(self) -> List[Card]:
+        return [Card(suit=suit, rank=self.rank) for suit in Suit]
 
 
 @dataclasses.dataclass
@@ -80,6 +87,12 @@ class SuitDeclaration(Declaration):
         if isinstance(other, SuitDeclaration):
             return self.length == other.length and self.high_rank == other.high_rank
         return False
+
+    def cards(self) -> List[Card]:
+        return [
+            Card(suit=self.suit, rank=Rank(i))
+            for i in range(self.high_rank.value, self.high_rank.value - self.length, -1)
+        ]
 
 
 class DeclarationDetector(abc.ABC):
@@ -141,7 +154,7 @@ class RankDeclarationDetector(DeclarationDetector):
 
 
 def get_player_declarations(cards: List[Card]) -> List[Declaration]:
-    declarations: List = []
+    declarations: List[Declaration] = []
     player_cards = set(map(Card.to_int, cards))
     rank_detectors: List[DeclarationDetector] = [
         RankDeclarationDetector(rank)

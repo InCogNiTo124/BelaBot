@@ -1,6 +1,12 @@
 from belabot.engine.belot import Belot
-from belabot.engine.player import RandomPlayer
+from belabot.engine.player import AiPlayer, BigBrain, RandomPlayer
 
-players = [RandomPlayer(f"{i}") for i in range(4)]
+big_brain = BigBrain()
+players = [
+    AiPlayer("0", big_brain),
+    RandomPlayer("1"),
+    AiPlayer("2", big_brain),
+    RandomPlayer("3"),
+]
 belot = Belot(players)
 belot.play()
