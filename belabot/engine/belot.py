@@ -9,6 +9,7 @@ import random
 import sys
 from functools import reduce
 from typing import List, Tuple, Sequence, Dict
+import more_itertools as mit
 
 random_gen = random.SystemRandom()
 
@@ -19,11 +20,15 @@ log.setLevel(os.environ.get("BB_LOGLEVEL", "INFO").upper())
 
 class Belot:
     def __init__(self, players: Sequence[Player]):
+        assert len(set(players)) == len(
+            players
+        ), "The players must all have different names"
         self.players = players
         self.deck = range(32)
         self.cards_played: List[Card] = []
-        self.mi = slice(0, None, 2)
-        self.vi = slice(1, None, 2)
+
+        for player, right, teammate, left in mit.circular_shifts(self.players):
+            player.team_setup(teammate, left, right)
         return
 
     def play(self) -> None:
@@ -43,8 +48,11 @@ class Belot:
         ### BIDDING PHASE
         first_6, talons = self.shuffle()
         self.deal_cards(first_6)
-        adut, mi_bid = self.get_adut(dealer_index)
-        log.debug(f'{"MI" if mi_bid else "VI"} have bid {repr(adut)} for adut')
+        adut, adut_caller_index = self.get_adut(dealer_index)
+        mi_bid = (adut_caller_index % 2) == 0
+        log.info(
+            f'{self.players[adut_caller_index].name} ({"MI" if mi_bid else "VI"}) have bid {repr(adut)} for adut'
+        )
         self.deal_cards(talons)
         all_declarations = self.compute_declarations(
             [player.cards for player in self.players], dealer_index
@@ -55,6 +63,8 @@ class Belot:
         log.debug("VI_DECL: {}".format(vi_declarations))
         total_points = 162 + sum(t.value() for t in mi_declarations + vi_declarations)
         log.debug("Total points: {}".format(total_points))
+
+        self.notify_pregame(all_declarations, adut, adut_caller_index)
 
         ### MAIN PHASE
         # mi_points = random_gen.randint(0, 162)
@@ -71,9 +81,6 @@ class Belot:
                 log.debug(f"\t{player.name} plays {repr(card)}")
                 turn_cards.append(card)
                 self.notify_played(player, card)
-            # assert len(turn_cards[self.mi]) == 2
-            # assert len(turn_cards[self.vi]) == 2
-            assert turn_cards[self.mi] != turn_cards[self.vi]
             turn_winner = get_winner(turn_cards, adut)
             log.debug(f"{turn_winner} wins the turn.")
             if (start_player_index + turn_winner) % 2 == 0:
@@ -123,6 +130,13 @@ class Belot:
             player.notify_turn_points(mi_points if i % 2 == 0 else vi_points)
         return
 
+    def notify_pregame(
+        self, declarations: Dict[int, List[Declaration]], adut: Suit, adut_caller: int
+    ) -> None:
+        for player in self.players:
+            player.notify_pregame(declarations, adut, self.players[adut_caller])
+        return
+
     def shuffle(self) -> Tuple[List[List[int]], List[List[int]]]:
         # Usually, cards in Bela are dealed in a particular order
         # this kinda makes sense in a real world where not all
@@ -143,14 +157,14 @@ class Belot:
             talons.append(deck[talon_start:player_cards_end])
         return adut_cards, talons
 
-    def get_adut(self, dealer_index: int) -> Tuple[Suit, bool]:
+    def get_adut(self, dealer_index: int) -> Tuple[Suit, int]:
         for i in range(1, 1 + len(self.players)):  # the dealer calls last
             player_index = (dealer_index + i) % len(self.players)
             log.debug(f"Player {player_index} bids...")
             player = self.players[player_index]
             adut = player.get_adut(is_muss=(i == 4))
             if adut != Adut.NEXT:
-                to_return = (Suit(adut.value), player_index % 2 == 0)
+                to_return = (Suit(adut.value), player_index)
                 break
         return to_return
 
@@ -163,7 +177,7 @@ class Belot:
             2: [],
             3: [],
         }  # absolute indices
-        for i in range(1, 1+len(self.players)):
+        for i in range(1, 1 + len(self.players)):
             player_index = (dealer_index + i) % len(self.players)
             player = self.players[player_index]
             cards = player_cards[player_index]

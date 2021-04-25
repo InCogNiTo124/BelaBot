@@ -1,6 +1,7 @@
 from .card import Card, Adut, Suit
+from .declarations import Declaration
 from .util import get_valid_moves
-from typing import List, Optional
+from typing import List, Optional, Dict
 import abc
 import random
 import sys
@@ -19,7 +20,11 @@ class Player(abc.ABC):
         self.cards: List[Card] = []
         self.played: List[Card] = []
         self.points: List[int] = []
+        self.turn_declarations: Dict[int, List[Declaration]] = dict()
         return
+
+    def __hash__(self) -> int:
+        return hash(self.name)
 
     def add_cards(self, cards: List[int]) -> None:
         self.cards.extend([Card.from_int(t) for t in cards])
@@ -34,6 +39,17 @@ class Player(abc.ABC):
         self.card_played(card)
         return
 
+    def notify_pregame(
+        self,
+        declarations: Dict[int, List[Declaration]],
+        adut: Suit,
+        adut_caller: "Player",
+    ) -> None:
+        self.turn_declarations = declarations
+        self.turn_adut = adut
+        self.turn_adut_called = adut_caller
+        return
+
     def card_accepted(self, card: Card) -> None:
         self.cards.remove(card)
         return
@@ -43,6 +59,12 @@ class Player(abc.ABC):
 
     def notify_turn_points(self, points: int) -> None:
         self.points.append(points)
+        return
+
+    def team_setup(self, teammate: "Player", left: "Player", right: "Player") -> None:
+        self.teammte = teammate
+        self.left = left
+        self.rigth = right
         return
 
     @abc.abstractmethod
