@@ -1,4 +1,4 @@
-from typing import Tuple, List, Iterable, Callable, Optional
+from typing import Tuple, List, Callable
 from .card import Card, Suit
 from functools import cmp_to_key
 

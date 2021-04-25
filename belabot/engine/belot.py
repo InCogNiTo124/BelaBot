@@ -7,7 +7,6 @@ import logging
 import os
 import random
 import sys
-from functools import reduce
 from typing import List, Tuple, Sequence, Dict
 import more_itertools as mit
 
@@ -45,7 +44,7 @@ class Belot:
         return
 
     def round(self, dealer_index: int) -> Tuple[int, int]:
-        ### BIDDING PHASE
+        # BIDDING PHASE
         first_6, talons = self.shuffle()
         self.deal_cards(first_6)
         adut, adut_caller_index = self.get_adut(dealer_index)
@@ -66,7 +65,7 @@ class Belot:
 
         self.notify_pregame(all_declarations, adut, adut_caller_index)
 
-        ### MAIN PHASE
+        # MAIN PHASE
         # mi_points = random_gen.randint(0, 162)
         mi_points, vi_points = 0, 0
         # next player starts first
@@ -122,7 +121,7 @@ class Belot:
             if other_player == player:
                 player.card_accepted(card)
             else:
-                other_player.notify_played(card)
+                other_player.notify_played(player, card)
         return
 
     def notify_turn_points(self, mi_points: int, vi_points: int) -> None:

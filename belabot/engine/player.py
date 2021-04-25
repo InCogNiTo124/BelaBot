@@ -2,12 +2,12 @@ from .card import Card, Adut, Suit
 from .declarations import Declaration
 from .util import get_valid_moves
 from typing import List, Optional, Dict
+from collections import defaultdict
 import abc
 import random
 import sys
 import os
 import logging
-import random
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.StreamHandler(sys.stdout))
@@ -18,7 +18,7 @@ class Player(abc.ABC):
     def __init__(self, name: Optional[str]) -> None:
         self.name: Optional[str] = name
         self.cards: List[Card] = []
-        self.played: List[Card] = []
+        self.played: Dict[Player, List[Card]] = defaultdict(list)
         self.points: List[int] = []
         self.turn_declarations: Dict[int, List[Declaration]] = dict()
         return
@@ -34,8 +34,8 @@ class Player(abc.ABC):
         self.cards.clear()
         return
 
-    def notify_played(self, card: Card) -> None:
-        self.played.append(card)
+    def notify_played(self, player: 'Player', card: Card) -> None:
+        self.played[player].append(card)
         self.card_played(card)
         return
 
@@ -52,6 +52,7 @@ class Player(abc.ABC):
 
     def card_accepted(self, card: Card) -> None:
         self.cards.remove(card)
+        self.notify_played(self, card)
         return
 
     def card_played(self, card: Card) -> None:

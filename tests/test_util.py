@@ -1,6 +1,5 @@
 from belabot.engine.util import calculate_points, get_valid_moves, get_winner
 from belabot.engine.card import Card, Suit, Rank
-from functools import cmp_to_key
 
 
 def test_calculate_points_no_decl():
@@ -100,7 +99,7 @@ def test_valid_moves():
             == player_cards
         )
 
-    ### two cards
+    # two cards
     # uber cards without adut
     for adut_suit in [Suit.DIAMONDS, Suit.SPADES, Suit.CLUBS]:
         assert (
