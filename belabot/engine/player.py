@@ -126,10 +126,15 @@ class Player(abc.ABC):
         self.played: Dict[Player, List[Card]] = defaultdict(list)
         self.points: List[int] = []
         self.round_declarations: Dict[Player, List[Declaration]] = dict()
+        self._brain = None
         return
 
     def __hash__(self) -> int:
         return hash(self.name)
+
+    @property
+    def brain(self):
+        return self._brain
 
     def add_cards(self, cards: List[int]) -> None:
         self.cards.extend([Card.from_int(t) for t in cards])
@@ -196,7 +201,7 @@ class RandomPlayer(Player):
 class AiPlayer(Player):
     def __init__(self, name: str, brain: Brain) -> None:
         super().__init__(name)
-        self.brain = brain
+        self._brain = brain
         return
 
     def get_adut(self, is_muss: bool) -> Adut:

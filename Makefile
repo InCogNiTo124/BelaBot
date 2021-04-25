@@ -7,5 +7,5 @@ test:
 	pytest -v tests/
 
 type:
-	mypy .
+	mypy --pretty .
 

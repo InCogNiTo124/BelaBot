@@ -2,13 +2,13 @@ import logging
 import os
 import random
 import sys
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple, Set
 
 import more_itertools as mit
 
 from .card import Adut, Card, Suit
 from .declarations import Declaration, get_player_declarations
-from .player import Player
+from .player import Player, Brain
 from .util import calculate_points, get_valid_moves, get_winner
 
 random_gen = random.SystemRandom()
@@ -26,9 +26,11 @@ class Belot:
         self.players = players
         self.deck = range(32)
         self.cards_played: List[Card] = []
-
+        self.brains: Set[Brain] = set()
         for player, right, teammate, left in mit.circular_shifts(self.players):
             player.team_setup(teammate, left, right)
+            self.brains.add(player.brain)
+        self.brains -= {None}
         return
 
     def play(self) -> None:
@@ -112,6 +114,7 @@ class Belot:
             sum(t.value() for t in vi_declarations),
         )
         log.debug(f"MI won {repr(mi_points)}, VI won {repr(vi_points)} in total.")
+        assert len(self.brains) > 0
         for player in self.players:
             player.clear_cards()
         return mi_points, vi_points
