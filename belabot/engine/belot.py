@@ -1,6 +1,6 @@
 from .card import Suit, Adut, Card
 from .player import Player
-from .declarations import get_player_declarations
+from .declarations import Declaration, get_player_declarations
 from .util import calculate_points, get_valid_moves, get_winner
 
 import logging
@@ -8,7 +8,7 @@ import os
 import random
 import sys
 from functools import reduce
-from typing import List, Tuple, Sequence
+from typing import List, Tuple, Sequence, Dict
 
 random_gen = random.SystemRandom()
 
@@ -46,9 +46,11 @@ class Belot:
         adut, mi_bid = self.get_adut(dealer_index)
         log.debug(f'{"MI" if mi_bid else "VI"} have bid {repr(adut)} for adut')
         self.deal_cards(talons)
-        mi_declarations, vi_declarations = self.compute_declarations(
+        all_declarations = self.compute_declarations(
             [player.cards for player in self.players], dealer_index
         )
+        mi_declarations = all_declarations[0] + all_declarations[2]
+        vi_declarations = all_declarations[1] + all_declarations[3]
         log.debug("MI_DECL: {}".format(mi_declarations))
         log.debug("VI_DECL: {}".format(vi_declarations))
         total_points = 162 + sum(t.value() for t in mi_declarations + vi_declarations)
@@ -154,12 +156,21 @@ class Belot:
 
     def compute_declarations(
         self, player_cards: List[List[Card]], dealer_index: int
-    ) -> Tuple[List, List]:
-        declarations_per_player = []
-        for i in range(1, 1 + len(self.players)):  # the dealer calls last
+    ) -> Dict[int, List[Declaration]]:
+        declarations_per_player: Dict[int, List[Declaration]] = {
+            0: [],
+            1: [],
+            2: [],
+            3: [],
+        }  # absolute indices
+        for i in range(1, 1+len(self.players)):
             player_index = (dealer_index + i) % len(self.players)
-            player_declarations = get_player_declarations(player_cards[player_index])
-            declarations_per_player.append((player_declarations, -(i - 1)))
+            player = self.players[player_index]
+            cards = player_cards[player_index]
+            log.debug(f"\t{player.name} {cards}")
+            player_declarations = get_player_declarations(cards)
+            declarations_per_player[player_index].extend(player_declarations)
+
         # Here's the trick: we are searching for the best declaration (in terms of points
         # and general ordering of declarations). But if it so happens that the two players
         # have the exact same declarations (e.g. both players have a sequence of three cards,
@@ -169,24 +180,22 @@ class Belot:
         # declares sooner.
         # PS nested for loop list comprehensions never truly made sense to me
         all_declarations = [
-            (declaration, player_index)
-            for player_declarations, player_index in declarations_per_player
-            for declaration in player_declarations
+            (declaration, -i)
+            for i in range(1, 1 + len(self.players))
+            for declaration in declarations_per_player[
+                (dealer_index + i) % len(self.players)
+            ]
         ]
-        print(all_declarations)
+        log.debug(all_declarations)
         if len(all_declarations) == 0:
-            return [], []
-        best_index = -max(all_declarations)[1]  # declarations are comparable
-        teammate_index = (best_index + 2) % len(declarations_per_player)
-        final_declarations = (
-            declarations_per_player[best_index][0]
-            + declarations_per_player[teammate_index][0]
-        )
-        # if the dealer_index is an even number, the dealer belongs to the team MI
-        # else the dealer belongs to the team VI
-        # in both cases, the dealer's team has a disadvantage which manifests itself
-        # as lack of precedence (explained earlier)
-        if dealer_index % 2 == 0:
-            return [], final_declarations
-        else:
-            return final_declarations, []
+            return declarations_per_player
+        best_relative_index = -max(all_declarations)[1]
+        best_index = (best_relative_index + dealer_index) % len(self.players)
+        teammate_index = (best_index + 2) % len(self.players)
+        final_declarations = {
+            best_index: declarations_per_player[best_index],
+            teammate_index: declarations_per_player[teammate_index],
+        }
+        for i in set(range(len(self.players))) - set([best_index, teammate_index]):
+            final_declarations[i] = []
+        return final_declarations
