@@ -1,2 +1,4 @@
 numpy
 more_itertools
+torch
+torch-discounted-cumsum

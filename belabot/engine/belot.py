@@ -116,8 +116,16 @@ class Belot:
         log.debug(f"MI won {repr(mi_points)}, VI won {repr(vi_points)} in total.")
         assert len(self.brains) > 0
         for player in self.players:
-            player.clear_cards()
+            assert len(player.cards) == 0
+        self.notify_rewards()
+        for brain in self.brains:
+            brain.train()   # haha sounds funny
         return mi_points, vi_points
+
+    def notify_rewards(self):
+        for player in self.players:
+            player.notify_rewards()
+        return
 
     def deal_cards(self, cards_list: List[List[int]]) -> None:
         for cards, player in zip(cards_list, self.players):

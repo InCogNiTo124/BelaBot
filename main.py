@@ -9,4 +9,7 @@ players = [
     RandomPlayer("3"),
 ]
 belot = Belot(players)
-belot.play()
+#belot.play()
+for i in range(1000):
+    print(i, end='\t')
+    belot.round(i % 4)

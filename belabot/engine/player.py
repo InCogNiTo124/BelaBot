@@ -8,6 +8,12 @@ import sys
 from collections import defaultdict
 from typing import Dict, List, Optional
 
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.distributions import Categorical
+from torch_discounted_cumsum import discounted_cumsum_right
+
 # from .player import 'Player'
 from .card import Adut, Card, Suit
 from .declarations import Declaration
@@ -17,6 +23,19 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.StreamHandler(sys.stdout))
 log.setLevel(os.environ.get("BB_LOGLEVEL", "INFO").upper())
 
+
+def indices_to_mask(indices, num_of_cards=32):
+    mask = torch.zeros(num_of_cards, dtype=float)
+    mask[indices] = 1.0
+    return mask
+
+
+class PolicyGradientLoss(nn.Module):
+    def forward(self, log_action_probabilities, discounted_rewards):
+        losses = - discounted_rewards * log_action_probabilities
+        loss = losses.mean()
+        #print(loss.requires_grad)
+        return loss
 
 class CardState(enum.Enum):
     UNKNOWN = 0  # there is no way of knowing where the card is
@@ -33,7 +52,43 @@ class CardState(enum.Enum):
     PLAYED_ME = 11  # the card was played in the past by me
 
 
+class Model(nn.Module):
+    def __init__(self, input_size):
+        super().__init__()
+        self.card_conv = nn.Conv1d(in_channels=1, out_channels=4, kernel_size=11, stride=11)
+        self.player_adut = nn.Linear(8, 8)
+        self.fc = nn.Linear(136, 32)
+        return
+
+    def forward(self, x):
+        assert x.shape == (1, 1, 360)
+        card_features = self.card_conv(x[..., :352])
+        assert card_features.shape == (1, 4, 32)
+        player_adut_features = self.player_adut(x[..., 352:])
+        assert player_adut_features.shape == (1, 1, 8)
+        cat = torch.cat((card_features.view(1, -1), player_adut_features.view(1, -1)), dim=-1)    # (1, 136)
+        assert cat.shape == (1, 136)
+        x = torch.tanh(cat)
+        logits = self.fc(x)
+        assert logits.shape == (1, 32)
+        return logits.view(-1)
+
 class Brain(abc.ABC):
+    def __init__(self, input_size):
+        self.model = Model(input_size)
+        self.model.train()
+        self.logprobs_per_player = defaultdict(list)
+        self.rewards_per_player = defaultdict(list)
+        self.loss = PolicyGradientLoss()
+        self.optimizer = optim.SGD(self.model.parameters(), lr=1e-2, momentum=0.9)
+        self.optimizer.zero_grad()
+        self.gamma = 1.0
+        return
+
+    def set_rewards(self, player, rewards_list):
+        self.rewards_per_player[player].extend(rewards_list)
+        return
+
     @abc.abstractmethod
     def get_state_representation(
         self,
@@ -47,8 +102,50 @@ class Brain(abc.ABC):
     ) -> List[int]:
         pass
 
+    def make_move(self, player, state, allowed_cards):
+        allowed_indices = torch.tensor([card.to_int() for card in allowed_cards])
+        #print(allowed_indices)
+        mask = indices_to_mask(allowed_indices)
+        logits = self.model(torch.FloatTensor(state).view(1, 1, -1))
+        c = Categorical(logits=logits)
+        c.probs *= mask
+        c = Categorical(probs=c.probs)  # lowkey hacky xd
+        card_idx = c.sample()
+        log_prob = c.log_prob(card_idx)
+        self.logprobs_per_player[player].append(log_prob)
+        return card_idx.item()
+
+    def train(self):
+        assert self.rewards_per_player.keys() == self.logprobs_per_player.keys()
+        # adam n shit
+        logprobs = torch.cat(
+            tuple(torch.tensor(lp, dtype=float, requires_grad=True) for lp in self.logprobs_per_player.values()),
+            dim=-1
+        )
+        assert logprobs.requires_grad
+        rewards = torch.cat(
+            tuple(
+                discounted_cumsum_right(torch.tensor(r, dtype=float).view(1, -1), self.gamma)
+                for r in self.rewards_per_player.values()),
+            dim=-1).view(-1)
+        assert not rewards.requires_grad
+        #print(logprobs)
+        #print(rewards)
+        loss = self.loss(logprobs, rewards)
+        log.info(f"LOSS: \t{loss}")
+        loss.backward()
+        self.optimizer.step()
+        self.optimizer.zero_grad()
+        for player in self.rewards_per_player.keys():
+            self.rewards_per_player[player].clear()
+            self.logprobs_per_player[player].clear()
+        return
+
 
 class BigBrain(Brain):
+    def __init__(self):
+        return super().__init__(360)
+
     def get_state_representation(
         self,
         current_player: "Player",
@@ -178,6 +275,12 @@ class Player(abc.ABC):
         self.right = right
         return
 
+    def notify_rewards(self):
+        if self.brain is not None:
+            self.brain.set_rewards(self, self.points)
+            self.points.clear()
+        return
+
     @abc.abstractmethod
     def get_adut(self, is_muss: bool) -> Adut:
         pass
@@ -208,6 +311,7 @@ class AiPlayer(Player):
         return Adut(random.choice(range(4 if is_muss else 5)) + 1)
 
     def play_card(self, turn_cards: List[Card], adut_suit: Suit) -> Card:
+        possible_cards = get_valid_moves(turn_cards, self.cards, adut_suit)
         state_encoding = self.brain.get_state_representation(
             self,
             self.played,
@@ -222,7 +326,6 @@ class AiPlayer(Player):
             self.round_adut,
             self.round_adut_caller,
         )
-        assert len(state_encoding) == 360
-        possible_cards = get_valid_moves(turn_cards, self.cards, adut_suit)
-        random_index = random.randrange(len(possible_cards))
-        return possible_cards[random_index]
+        assert len(state_encoding) == 32 * (len(CardState) - 1) + 8
+        card_id = self._brain.make_move(self, state_encoding, possible_cards)
+        return Card.from_int(card_id)
