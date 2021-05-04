@@ -24,10 +24,10 @@ log.addHandler(logging.StreamHandler(sys.stdout))
 log.setLevel(os.environ.get("BB_LOGLEVEL", "INFO").upper())
 
 
-def indices_to_mask(indices, num_of_cards=32):
+def indices_to_mask(indices, num_of_cards=32, device=torch.device('cuda')):
     mask = torch.zeros(num_of_cards, dtype=float)
     mask[indices] = 1.0
-    return mask
+    return mask.to(device)
 
 
 class PolicyGradientLoss(nn.Module):
@@ -75,11 +75,14 @@ class Model(nn.Module):
 
 class Brain(abc.ABC):
     def __init__(self, input_size):
-        self.model = Model(input_size)
-        self.model.train()
         self.logprobs_per_player = defaultdict(list)
         self.rewards_per_player = defaultdict(list)
+        self.model = Model(input_size)
+        self.model.train()
         self.loss = PolicyGradientLoss()
+        if torch.cuda.is_available():
+            self.model.cuda()
+            self.loss.cuda()
         self.optimizer = optim.SGD(self.model.parameters(), lr=1e-2, momentum=0.9)
         self.optimizer.zero_grad()
         self.gamma = 1.0
@@ -106,7 +109,7 @@ class Brain(abc.ABC):
         allowed_indices = torch.tensor([card.to_int() for card in allowed_cards])
         #print(allowed_indices)
         mask = indices_to_mask(allowed_indices)
-        logits = self.model(torch.FloatTensor(state).view(1, 1, -1))
+        logits = self.model(torch.FloatTensor(state).cuda().view(1, 1, -1))
         c = Categorical(logits=logits)
         c.probs *= mask
         c = Categorical(probs=c.probs)  # lowkey hacky xd
@@ -119,13 +122,13 @@ class Brain(abc.ABC):
         assert self.rewards_per_player.keys() == self.logprobs_per_player.keys()
         # adam n shit
         logprobs = torch.cat(
-            tuple(torch.tensor(lp, dtype=float, requires_grad=True) for lp in self.logprobs_per_player.values()),
+            tuple(torch.tensor(lp, dtype=float, requires_grad=True).cuda() for lp in self.logprobs_per_player.values()),
             dim=-1
         )
         assert logprobs.requires_grad
         rewards = torch.cat(
             tuple(
-                discounted_cumsum_right(torch.tensor(r, dtype=float).view(1, -1), self.gamma)
+                discounted_cumsum_right(torch.tensor(r, dtype=float, device='cuda').view(1, -1), self.gamma)
                 for r in self.rewards_per_player.values()),
             dim=-1).view(-1)
         assert not rewards.requires_grad
