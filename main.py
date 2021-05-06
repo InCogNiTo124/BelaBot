@@ -1,5 +1,7 @@
 from belabot.engine.belot import Belot
 from belabot.engine.player import AiPlayer, BigBrain, RandomPlayer
+import time
+import torch
 
 big_brain = BigBrain()
 players = [
@@ -10,6 +12,11 @@ players = [
 ]
 belot = Belot(players)
 #belot.play()
-for i in range(1000):
+since = time.time()
+for i in range(1_000):
     print(i, end='\t')
     belot.round(i % 4)
+    new_time = time.time()
+    #log.debug(new_time - since)
+    since = new_time
+big_brain.save()

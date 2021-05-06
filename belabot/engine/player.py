@@ -8,8 +8,10 @@ import sys
 from collections import defaultdict
 from typing import Dict, List, Optional
 
+import time
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
 from torch_discounted_cumsum import discounted_cumsum_right
@@ -25,9 +27,10 @@ log.setLevel(os.environ.get("BB_LOGLEVEL", "INFO").upper())
 
 
 def indices_to_mask(indices, num_of_cards=32, device=torch.device('cuda')):
-    mask = torch.zeros(num_of_cards, dtype=float)
+    mask = torch.zeros(num_of_cards, dtype=float, device=device, requires_grad=False)
     mask[indices] = 1.0
-    return mask.to(device)
+    assert not mask.requires_grad
+    return mask
 
 
 class PolicyGradientLoss(nn.Module):
@@ -61,6 +64,8 @@ class Model(nn.Module):
         return
 
     def forward(self, x):
+        assert not x.requires_grad
+        since = time.time()
         assert x.shape == (1, 1, 360)
         card_features = self.card_conv(x[..., :352])
         assert card_features.shape == (1, 4, 32)
@@ -71,6 +76,8 @@ class Model(nn.Module):
         x = torch.tanh(cat)
         logits = self.fc(x)
         assert logits.shape == (1, 32)
+        print(f'\tModel time: {time.time() - since}')
+        del cat, player_adut_features, card_features
         return logits.view(-1)
 
 class Brain(abc.ABC):
@@ -86,6 +93,12 @@ class Brain(abc.ABC):
         self.optimizer = optim.SGD(self.model.parameters(), lr=1e-2, momentum=0.9)
         self.optimizer.zero_grad()
         self.gamma = 1.0
+        return
+
+    def save(self):
+        import tempfile
+        with tempfile.TemporaryFile(suffix='.pth', dir='.') as file:
+            torch.save(self.model.state_dict(), file)
         return
 
     def set_rewards(self, player, rewards_list):
@@ -106,29 +119,38 @@ class Brain(abc.ABC):
         pass
 
     def make_move(self, player, state, allowed_cards):
-        allowed_indices = torch.tensor([card.to_int() for card in allowed_cards])
+        since = time.time()
+        allowed_indices = torch.tensor([card.to_int() for card in allowed_cards], requires_grad=False, device='cuda')
+        assert not allowed_indices.requires_grad
         #print(allowed_indices)
         mask = indices_to_mask(allowed_indices)
-        logits = self.model(torch.FloatTensor(state).cuda().view(1, 1, -1))
-        c = Categorical(logits=logits)
-        c.probs *= mask
-        c = Categorical(probs=c.probs)  # lowkey hacky xd
+        x = torch.tensor(state, dtype=torch.float32, requires_grad=False, device='cuda').view(1, 1, -1)
+        logits = self.model(x)
+        probs = F.softmax(logits, dim=-1)
+        probs *= mask
+        c = Categorical(probs=probs)  # lowkey hacky xd
         card_idx = c.sample()
+        assert not card_idx.requires_grad
+        card_idx.detach()
         log_prob = c.log_prob(card_idx)
+        assert log_prob.requires_grad
         self.logprobs_per_player[player].append(log_prob)
-        return card_idx.item()
+        x.detach()
+        print(f'\tMove time: {time.time() - since}')
+        return card_idx.detach().cpu().item()
 
     def train(self):
+        since = time.time()
         assert self.rewards_per_player.keys() == self.logprobs_per_player.keys()
         # adam n shit
         logprobs = torch.cat(
-            tuple(torch.tensor(lp, dtype=float, requires_grad=True).cuda() for lp in self.logprobs_per_player.values()),
+            tuple(torch.tensor(lp, dtype=float, requires_grad=True, device='cuda') for lp in self.logprobs_per_player.values()),
             dim=-1
         )
         assert logprobs.requires_grad
         rewards = torch.cat(
             tuple(
-                discounted_cumsum_right(torch.tensor(r, dtype=float, device='cuda').view(1, -1), self.gamma)
+                discounted_cumsum_right(torch.tensor(r, dtype=float, requires_grad=False, device='cuda').view(1, -1), self.gamma)
                 for r in self.rewards_per_player.values()),
             dim=-1).view(-1)
         assert not rewards.requires_grad
@@ -137,13 +159,22 @@ class Brain(abc.ABC):
         loss = self.loss(logprobs, rewards)
         log.info(f"LOSS: \t{loss}")
         loss.backward()
+        
         self.optimizer.step()
-        self.optimizer.zero_grad()
-        for player in self.rewards_per_player.keys():
-            self.rewards_per_player[player].clear()
-            self.logprobs_per_player[player].clear()
+        self.optimizer.zero_grad(set_to_none=True)
+        keys = list(self.rewards_per_player.keys())
+        for player in keys:
+            del self.rewards_per_player[player]
+            for _ in range(len(self.logprobs_per_player[player])):
+                self.logprobs_per_player[player][0].detach()
+                del self.logprobs_per_player[player][0]
+            del self.logprobs_per_player[player]# .clear()
+        del rewards, logprobs, loss
+        torch.cuda.empty_cache()
+        self.model.eval()
+        self.model.train()
+        print(f'\tTrain time: {time.time() - since}')
         return
-
 
 class BigBrain(Brain):
     def __init__(self):
