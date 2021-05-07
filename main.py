@@ -4,6 +4,7 @@ import time
 import torch
 
 big_brain = BigBrain()
+big_brain.model.eval()
 players = [
     AiPlayer("0", big_brain),
     RandomPlayer("1"),
