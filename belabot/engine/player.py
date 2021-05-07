@@ -26,6 +26,10 @@ log.addHandler(logging.StreamHandler(sys.stdout))
 log.setLevel(os.environ.get("BB_LOGLEVEL", "INFO").upper())
 
 
+def cumsum_reverse(x, dim=-1):
+    return x + torch.sum(x, dim=dim, keepdims=True) - torch.cumsum(x, dim=dim)
+
+
 def indices_to_mask(indices, num_of_cards=32, device=torch.device('cuda')):
     mask = torch.zeros(num_of_cards, dtype=torch.float32, device=device, requires_grad=False)
     mask[indices] = 1.0
@@ -35,7 +39,7 @@ def indices_to_mask(indices, num_of_cards=32, device=torch.device('cuda')):
 
 class PolicyGradientLoss(nn.Module):
     def forward(self, log_action_probabilities, discounted_rewards):
-        losses = - discounted_rewards * log_action_probabilities
+        losses = -discounted_rewards * log_action_probabilities
         loss = losses.mean()
         #print(loss.requires_grad)
         return loss
@@ -80,7 +84,7 @@ class Model(nn.Module):
         x = torch.tanh(x)
         logits = self.fc(x)
         assert logits.shape == (N_p*N_t, 32)
-        print(f'\tModel time: {time.time() - since}')
+        #print(f'\tModel time: {time.time() - since}')
         #del cat, player_adut_features, card_features
         return logits.view(N_p, N_t, -1)
 
@@ -91,10 +95,11 @@ class Brain(abc.ABC):
         self.samples_per_player = defaultdict(list)
         self.rewards_per_player = defaultdict(list)
         self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        log.info(f"Device: {self.device}")
         self.model = Model(input_size).to(self.device)
         self.model.eval()
         self.loss = PolicyGradientLoss().to(self.device)
-        self.optimizer = optim.SGD(self.model.parameters(), lr=1e-2, momentum=0.9)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=5e-3)
         self.optimizer.zero_grad()
         self.gamma = 1.0
         return
@@ -131,59 +136,95 @@ class Brain(abc.ABC):
                 device=self.device
             )
             assert not allowed_indices.requires_grad
-            #print(allowed_indices)
             mask = indices_to_mask(allowed_indices, device=self.device)
             x = torch.tensor(state, dtype=torch.float32, requires_grad=False, device=self.device).view(1, 1, -1)
-            self.input_states_per_player[player].append(x)
-            self.masks_per_player[player].append(mask)
+            self.input_states_per_player[player].append(state)
+            self.masks_per_player[player].append(mask.tolist())     # due to memory bugs, I store lists
             logits = self.model(x)
             probs = F.softmax(logits, dim=-1)
-            probs *= mask
-            c = Categorical(probs=probs)  # lowkey hacky xd
-            card_idx = c.sample()
+            assert not probs.requires_grad
+            probs2 = probs * mask
+            try:
+                c = Categorical(probs=probs2)  # lowkey hacky xd
+            except ValueError as ex:
+                print(allowed_indices)
+                print(probs)
+                print(probs2)
+                print(logits)
+                raise ex
+            card_idx = c.sample().item()
+            del probs
             self.samples_per_player[player].append(card_idx)
-            assert not card_idx.requires_grad
-            x.detach()
         #print(f'\tMove time: {time.time() - since}')
-        return card_idx.detach().cpu().item()
+        return card_idx
 
     def train(self):
-        #self.model.train()
-        #since = time.time()
-        #assert self.rewards_per_player.keys() == self.logprobs_per_player.keys()
-        ## adam n shit
-        #logprobs = torch.cat(
-        #    tuple(torch.tensor(lp, dtype=float, requires_grad=True, device='cuda') for lp in self.logprobs_per_player.values()),
-        #    dim=-1
-        #)
-        #assert logprobs.requires_grad
-        #rewards = torch.cat(
-        #    tuple(
-        #        discounted_cumsum_right(torch.tensor(r, dtype=float, requires_grad=False, device='cuda').view(1, -1), self.gamma)
-        #        for r in self.rewards_per_player.values()),
-        #    dim=-1).view(-1)
-        #assert not rewards.requires_grad
-        ##print(logprobs)
+        self.model.train()
+        since = time.time()
+
+        masks = torch.tensor(
+            list(self.masks_per_player.values()),
+            requires_grad=False,
+            dtype=torch.float32,
+            device=self.device
+        )
+        assert masks.shape == (len(self.masks_per_player), 8, 32)
+
+        inputs = torch.tensor(
+            list(self.input_states_per_player.values()),
+            requires_grad=False,
+            dtype=torch.float32,
+            device=self.device)
+        assert inputs.shape == (len(self.input_states_per_player), 8, 360)
+
+        samples = torch.tensor(
+            list(self.samples_per_player.values()),
+            requires_grad=False,
+            dtype=torch.float32,
+            device=self.device
+        )
+        assert samples.shape == (len(self.samples_per_player), 8)
+
+        rewards = torch.tensor(
+            list(self.rewards_per_player.values()),
+            requires_grad=False,
+            dtype=torch.float32,
+            device=self.device
+        )
+        assert rewards.shape == samples.shape
+        discounted_rewards = cumsum_reverse(rewards, dim=-1)
+
+        logits = self.model(inputs)
+        assert logits.shape == masks.shape
+        probs = F.softmax(logits, dim=-1)
+        probs = probs*masks
+        try:
+            c = Categorical(probs=probs)
+        except ValueError as ex:
+            print(probs)
+            raise ex
+        logprobs = c.log_prob(samples)
+        assert logprobs.shape == rewards.shape
         ##print(rewards)
-        #loss = self.loss(logprobs, rewards)
-        #log.info(f"LOSS: \t{loss}")
-        #loss.backward()
+        loss = self.loss(logprobs, discounted_rewards)
+        log.info(f"LOSS: \t{loss}")
+        loss.backward()
         #
-        #self.optimizer.step()
-        #self.optimizer.zero_grad(set_to_none=True)
+        self.optimizer.step()
+        self.optimizer.zero_grad(set_to_none=True)
         keys = list(self.rewards_per_player.keys())
-        print(len(self.rewards_per_player[keys[0]]))
-        print(len(self.input_states_per_player[keys[0]]))
-        print(len(self.masks_per_player[keys[0]]))
-        print(len(self.samples_per_player[keys[0]]))
         for player in keys:
+            assert len(self.rewards_per_player[player]) == 8
             assert all(isinstance(t, int) for t in self.rewards_per_player[player])
             del self.rewards_per_player[player]
-            assert not any(t.requires_grad for t in self.input_states_per_player[player])
+            assert len(self.input_states_per_player[player]) == 8
+            assert all(isinstance(t, list) for t in self.input_states_per_player[player])
             del self.input_states_per_player[player]
-            assert not any(t.requires_grad for t in self.masks_per_player[player])
+            assert len(self.masks_per_player[player]) == 8
+            assert all(isinstance(t, list) for t in self.masks_per_player[player])
             del self.masks_per_player[player]
-            assert not any(t.requires_grad for t in self.samples_per_player[player])
+            assert len(self.samples_per_player[player]) == 8
+            assert all(isinstance(t, int) for t in self.samples_per_player[player])
             del self.samples_per_player[player]
             #del self.logprobs_per_player[player]# .clear()
         #del rewards, logprobs, loss

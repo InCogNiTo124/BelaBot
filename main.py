@@ -5,6 +5,7 @@ import torch
 
 big_brain = BigBrain()
 big_brain.model.eval()
+print(list(big_brain.model.children()))
 players = [
     AiPlayer("0", big_brain),
     RandomPlayer("1"),
@@ -14,7 +15,7 @@ players = [
 belot = Belot(players)
 #belot.play()
 since = time.time()
-for i in range(1_000):
+for i in range(10_000):
     print(i, end='\t')
     belot.round(i % 4)
     new_time = time.time()
