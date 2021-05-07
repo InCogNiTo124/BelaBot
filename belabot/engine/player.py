@@ -106,8 +106,9 @@ class Brain(abc.ABC):
 
     def save(self):
         import tempfile
-        with tempfile.TemporaryFile(suffix='.pth', dir='.') as file:
+        with tempfile.NamedTemporaryFile(prefix='rl-model-', suffix='.pth', dir='.', delete=False) as file:
             torch.save(self.model.state_dict(), file)
+        log.info(f"Saved model @ {file.name}")
         return
 
     def set_rewards(self, player, rewards_list):
@@ -211,7 +212,7 @@ class Brain(abc.ABC):
         loss.backward()
         #
         self.optimizer.step()
-        self.optimizer.zero_grad(set_to_none=True)
+        self.optimizer.zero_grad()
         keys = list(self.rewards_per_player.keys())
         for player in keys:
             assert len(self.rewards_per_player[player]) == 8

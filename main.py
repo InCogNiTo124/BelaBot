@@ -15,7 +15,7 @@ players = [
 belot = Belot(players)
 #belot.play()
 since = time.time()
-for i in range(10_000):
+for i in range(100):
     print(i, end='\t')
     belot.round(i % 4)
     new_time = time.time()
