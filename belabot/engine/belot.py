@@ -117,14 +117,14 @@ class Belot:
         assert len(self.brains) > 0
         for player in self.players:
             assert len(player.cards) == 0
-        self.notify_rewards()
+        self.notify_rewards(mi_points, vi_points)
         for brain in self.brains:
             brain.train()   # haha sounds funny
         return mi_points, vi_points
 
-    def notify_rewards(self):
-        for player in self.players:
-            player.notify_rewards()
+    def notify_rewards(self, mi_points, vi_points):
+        for i, player in enumerate(self.players):
+            player.notify_rewards(mi_points if i % 2 == 0 else vi_points)
         return
 
     def deal_cards(self, cards_list: List[List[int]]) -> None:

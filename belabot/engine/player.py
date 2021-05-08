@@ -60,7 +60,7 @@ class CardState(enum.Enum):
 
 
 class Model(nn.Module):
-    def __init__(self, input_size):
+    def __init__(self):
         super().__init__()
         self.card_conv = nn.Conv1d(in_channels=1, out_channels=4, kernel_size=11, stride=11)
         self.player_adut = nn.Linear(8, 8)
@@ -88,26 +88,70 @@ class Model(nn.Module):
         #del cat, player_adut_features, card_features
         return logits.view(N_p, N_t, -1)
 
+
+class AdutModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv = nn.Conv1d(in_channels=1, out_channels=4, kernel_size=8, stride=8)
+        self.fc = nn.Linear(16, 5)
+        return
+
+    def forward(self, x):
+        assert x.ndim == 3
+        N_p, N_c, N_d = x.shape
+        assert N_c == 1
+        assert N_d == 32
+        features = self.conv(x).view(N_p, -1)
+        features = torch.tanh(features)
+        return self.fc(features)
+
+
 class Brain(abc.ABC):
-    def __init__(self, input_size):
+    def __init__(self, checkpoint=None):
         self.input_states_per_player = defaultdict(list)
         self.masks_per_player = defaultdict(list)
         self.samples_per_player = defaultdict(list)
         self.rewards_per_player = defaultdict(list)
+        self.adut_cards_per_player = defaultdict(list)
+        self.adut_points_per_player = dict()
+        self.muss_per_player = dict()
+        self.adut_sampled_per_player = dict()
+
         self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         log.info(f"Device: {self.device}")
-        self.model = Model(input_size).to(self.device)
+        self.model = Model().to(self.device)
         self.model.eval()
         self.loss = PolicyGradientLoss().to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=5e-3)
         self.optimizer.zero_grad()
-        self.gamma = 1.0
+
+        self.adut_model = AdutModel()
+        self.adut_model.eval().to(self.device)
+        self.adut_loss = PolicyGradientLoss().to(self.device)
+        self.adut_optimizer = optim.Adam(self.adut_model.parameters(), lr=0.01)
+        self.adut_optimizer.zero_grad()
+
+        if checkpoint is not None:
+            with checkpoint as file: #this will close it
+                save_dict = torch.load(file)
+                self.model.load_state_dict(save_dict['model']),
+                self.adut_model.load_state_dict(save_dict['adut_model'])
+                self.optimizer.load_state_dict(save_dict['optimizer'])
+                self.adut_optimizer.load_state_dict(save_dict['adut_optimizer'])
+            assert checkpoint.closed
+            log.info(f"Loaded checkpoint {checkpoint.name}")
         return
 
     def save(self):
         import tempfile
         with tempfile.NamedTemporaryFile(prefix='rl-model-', suffix='.pth', dir='.', delete=False) as file:
-            torch.save(self.model.state_dict(), file)
+            save_dict = {
+                'model': self.model.state_dict(),
+                'adut_model': self.adut_model.state_dict(),
+                'optimizer': self.optimizer.state_dict(),
+                'adut_optimizer': self.adut_optimizer.state_dict()
+            }
+            torch.save(save_dict, file)
         log.info(f"Saved model @ {file.name}")
         return
 
@@ -159,7 +203,7 @@ class Brain(abc.ABC):
         #print(f'\tMove time: {time.time() - since}')
         return card_idx
 
-    def train(self):
+    def train_model(self):
         self.model.train()
         since = time.time()
 
@@ -208,7 +252,7 @@ class Brain(abc.ABC):
         assert logprobs.shape == rewards.shape
         ##print(rewards)
         loss = self.loss(logprobs, discounted_rewards)
-        log.info(f"LOSS: \t{loss}")
+        log.info(f"PLAY LOSS: \t{loss}")
         loss.backward()
         #
         self.optimizer.step()
@@ -234,9 +278,81 @@ class Brain(abc.ABC):
         self.model.eval()
         return
 
+    def train_adut_model(self):
+        assert list(self.adut_cards_per_player.keys()) == list(self.muss_per_player.keys())
+        assert list(self.adut_cards_per_player.keys()) == list(self.adut_sampled_per_player.keys())
+        assert list(self.adut_cards_per_player.keys()) == list(self.adut_points_per_player.keys())
+        if len(self.adut_cards_per_player) > 0:
+            # if ai players had a chance to decide adut at all
+            self.adut_model.train()
+            inputs = torch.tensor(
+                list(self.adut_cards_per_player.values()),
+                requires_grad=False,
+                device=self.device,
+                dtype=torch.float32
+            )
+            sampled = torch.tensor(
+                list(self.adut_sampled_per_player.values()),
+                requires_grad=False,
+                device=self.device,
+                dtype=torch.float32
+            )
+            points = torch.tensor(
+                list(self.adut_points_per_player.values()),
+                requires_grad=False,
+                device=self.device,
+                dtype=torch.float32
+            )
+            #print(inputs, inputs.shape)
+            logits = self.adut_model(inputs)
+            probs = F.softmax(logits, dim=-1)
+            for muss, i in zip(self.muss_per_player.values(), range(len(probs))):
+                if muss:
+                    probs[i, -1] = 0.0
+            c = Categorical(probs=probs)
+            logprobs = c.log_prob(sampled)
+            assert logprobs.shape == points.shape, f"{logprobs} {points}"
+            loss = self.adut_loss(logprobs, points)
+            log.info(f'ADUT LOSS: {loss}')
+            loss.backward()
+            self.adut_optimizer.step()
+            self.adut_optimizer.zero_grad()
+
+            self.adut_cards_per_player.clear()  # = defaultdict(list)
+            self.adut_points_per_player.clear()
+            self.muss_per_player.clear()
+            self.adut_sampled_per_player.clear()
+            self.adut_model.eval()
+        return
+
+    def train(self):
+        self.train_model()
+        self.train_adut_model()
+        return
+
+    def get_adut(self, player, card_idx_list, is_muss):
+        with torch.no_grad():
+            cards = torch.tensor(card_idx_list, device=self.device)
+            model_input = indices_to_mask(cards)
+            self.adut_cards_per_player[player].append(model_input.tolist())
+            logits = self.adut_model(model_input.view(1, 1, -1))
+            probs = F.softmax(logits, dim=-1)
+            if is_muss:
+                probs[..., -1] = 0.0
+            c = Categorical(probs=probs)
+            suit_idx = c.sample().item()
+        self.muss_per_player[player] = is_muss
+        self.adut_sampled_per_player[player] = suit_idx
+        return suit_idx
+
+    def adut_feedback(self, player, points):
+        if player in self.adut_sampled_per_player:
+            self.adut_points_per_player[player] = points
+        return
+
 class BigBrain(Brain):
-    def __init__(self):
-        return super().__init__(360)
+    def __init__(self, checkpoint=None):
+        return super().__init__(checkpoint)
 
     def get_state_representation(
         self,
@@ -367,9 +483,10 @@ class Player(abc.ABC):
         self.right = right
         return
 
-    def notify_rewards(self):
+    def notify_rewards(self, final_points):
         if self.brain is not None:
             self.brain.set_rewards(self, self.points)
+            self.brain.adut_feedback(self, final_points)
             self.points.clear()
         return
 
@@ -385,7 +502,13 @@ class Player(abc.ABC):
 class RandomPlayer(Player):
     def get_adut(self, is_muss: bool) -> Adut:
         # log.debug("\t" + repr(self.cards))
-        return Adut(random.choice(range(4 if is_muss else 5)) + 1)
+        if not is_muss:
+            options = [1, 2, 3, 4, 5]
+            weights = [0.125, 0.125, 0.125, 0.125, 0.5]
+        else:
+            options = [1, 2, 3, 4]
+            weights = None
+        return Adut(random.choices(options, weights=weights, k=1)[0])
 
     def play_card(self, turn_cards: List[Card], adut_suit: Suit) -> Card:
         possible_cards = get_valid_moves(turn_cards, self.cards, adut_suit)
@@ -400,6 +523,7 @@ class AiPlayer(Player):
         return
 
     def get_adut(self, is_muss: bool) -> Adut:
+        suit_idx = self._brain.get_adut(self, list(map(Card.to_int, self.cards)), is_muss)
         return Adut(random.choice(range(4 if is_muss else 5)) + 1)
 
     def play_card(self, turn_cards: List[Card], adut_suit: Suit) -> Card:
