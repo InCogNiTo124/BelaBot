@@ -30,8 +30,8 @@ def cumsum_reverse(x, dim=-1):
     return x + torch.sum(x, dim=dim, keepdims=True) - torch.cumsum(x, dim=dim)
 
 
-def indices_to_mask(indices, num_of_cards=32, device=torch.device('cuda')):
-    mask = torch.zeros(num_of_cards, dtype=torch.float32, device=device, requires_grad=False)
+def indices_to_mask(indices, num=32, device=torch.device('cuda')):
+    mask = torch.zeros(num, dtype=torch.float32, device=device, requires_grad=False)
     mask[indices] = 1.0
     assert not mask.requires_grad
     return mask
@@ -281,7 +281,7 @@ class Brain(abc.ABC):
     def train_adut_model(self):
         assert list(self.adut_cards_per_player.keys()) == list(self.muss_per_player.keys())
         assert list(self.adut_cards_per_player.keys()) == list(self.adut_sampled_per_player.keys())
-        assert list(self.adut_cards_per_player.keys()) == list(self.adut_points_per_player.keys())
+        #assert list(self.adut_cards_per_player.keys()) == list(self.adut_points_per_player.keys())
         if len(self.adut_cards_per_player) > 0:
             # if ai players had a chance to decide adut at all
             self.adut_model.train()
@@ -306,9 +306,13 @@ class Brain(abc.ABC):
             #print(inputs, inputs.shape)
             logits = self.adut_model(inputs)
             probs = F.softmax(logits, dim=-1)
-            for muss, i in zip(self.muss_per_player.values(), range(len(probs))):
-                if muss:
-                    probs[i, -1] = 0.0
+            mask = torch.stack(
+                tuple(
+                    indices_to_mask(list(range(4 if muss else 5)), num=5)
+                    for muss in self.muss_per_player.values())
+            )
+            
+            probs = probs * mask
             c = Categorical(probs=probs)
             logprobs = c.log_prob(sampled)
             assert logprobs.shape == points.shape, f"{logprobs} {points}"
@@ -524,7 +528,7 @@ class AiPlayer(Player):
 
     def get_adut(self, is_muss: bool) -> Adut:
         suit_idx = self._brain.get_adut(self, list(map(Card.to_int, self.cards)), is_muss)
-        return Adut(random.choice(range(4 if is_muss else 5)) + 1)
+        return Adut(suit_idx + 1)
 
     def play_card(self, turn_cards: List[Card], adut_suit: Suit) -> Card:
         possible_cards = get_valid_moves(turn_cards, self.cards, adut_suit)
