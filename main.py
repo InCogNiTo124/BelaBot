@@ -7,6 +7,7 @@ import argparse
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--from-checkpoint', type=argparse.FileType('rb'), dest='checkpoint')
+    parser.add_argument('--save-as', type=str, default=None, dest='model_filename')
     parser.add_argument('--no-save', action='store_false', dest='do_save')
     parser.add_argument('--epochs', type=int, default=100)
     return parser.parse_args()
@@ -31,7 +32,7 @@ def main(args):
         #log.debug(new_time - since)
         since = new_time
     if args.do_save:
-        big_brain.save()
+        big_brain.save(args.model_filename)
 
 if __name__ == '__main__':
     args = get_args()

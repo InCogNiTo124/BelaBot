@@ -113,7 +113,7 @@ class Belot:
             sum(t.value() for t in mi_declarations),
             sum(t.value() for t in vi_declarations),
         )
-        log.debug(f"MI won {repr(mi_points)}, VI won {repr(vi_points)} in total.")
+        log.info(f"MI won {repr(mi_points)}, VI won {repr(vi_points)} in total.")
         assert len(self.brains) > 0
         for player in self.players:
             assert len(player.cards) == 0

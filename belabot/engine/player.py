@@ -142,9 +142,14 @@ class Brain(abc.ABC):
             log.info(f"Loaded checkpoint {checkpoint.name}")
         return
 
-    def save(self):
+    def save(self, filename=None):
         import tempfile
-        with tempfile.NamedTemporaryFile(prefix='rl-model-', suffix='.pth', dir='.', delete=False) as file:
+        file = (
+            tempfile.NamedTemporaryFile(prefix='rl-model-', suffix='.pth', dir='.', delete=False)
+            if filename is None else
+            open(filename, 'wb')
+        )
+        with file:
             save_dict = {
                 'model': self.model.state_dict(),
                 'adut_model': self.adut_model.state_dict(),
