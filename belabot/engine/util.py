@@ -2,10 +2,24 @@ from functools import cmp_to_key
 from typing import Callable, List, Tuple
 
 from .card import Card, Suit
+import logging
+import sys
+import os
+import random
+
 
 DECK_TOTAL = 162
 STIGLJA_PENALTY = 90
 
+
+def get_logger(name=__name__):
+    log = logging.getLogger(name)
+    log.addHandler(logging.StreamHandler(sys.stdout))
+    log.setLevel(os.environ.get('BB_LOGLEVEL', 'INFO').upper())
+    return log
+
+def get_random():
+    return random.SystemRandom()
 
 def one_hot_encode(i: int, length: int) -> List[int]:
     """One-Hot encode a number from available numbers

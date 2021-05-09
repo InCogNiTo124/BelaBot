@@ -1,7 +1,3 @@
-import logging
-import os
-import random
-import sys
 from typing import Dict, List, Sequence, Tuple, Set
 
 import more_itertools as mit
@@ -9,13 +5,11 @@ import more_itertools as mit
 from .card import Adut, Card, Suit
 from .declarations import Declaration, get_player_declarations
 from .player import Player, Brain
-from .util import calculate_points, get_valid_moves, get_winner
+from .util import calculate_points, get_valid_moves, get_winner, get_logger, get_random
 
-random_gen = random.SystemRandom()
+random = get_random()
 
-log = logging.getLogger(__name__)
-log.addHandler(logging.StreamHandler(sys.stdout))
-log.setLevel(os.environ.get("BB_LOGLEVEL", "INFO").upper())
+log = get_logger(__name__)
 
 
 class Belot:
@@ -50,10 +44,11 @@ class Belot:
         # BIDDING PHASE
         first_6, talons = self.shuffle()
         self.deal_cards(first_6)
-        adut, adut_caller_index = self.get_adut(dealer_index)
+        adut, adut_caller_index, is_muss = self.get_adut(dealer_index)
         mi_bid = (adut_caller_index % 2) == 0
         log.info(
             f'{self.players[adut_caller_index].name} ({"MI" if mi_bid else "VI"}) have bid {repr(adut)} for adut'
+            + (" pod muss" if is_muss else "")
         )
         self.deal_cards(talons)
         all_declarations = self.compute_declarations(
@@ -106,7 +101,7 @@ class Belot:
             start_player_index = (start_player_index + turn_winner) % len(self.players)
             turn_cards.clear()
         assert (mi_points + vi_points) == 162
-        log.debug(f"MI won {repr(mi_points)}, VI won {repr(162 - mi_points)} in game.")
+        log.info(f"MI won {repr(mi_points)}, VI won {repr(vi_points)} in game.")
         mi_points, vi_points = calculate_points(
             mi_points,
             mi_bid,
@@ -119,7 +114,7 @@ class Belot:
             assert len(player.cards) == 0
         self.notify_rewards(mi_points, vi_points)
         for brain in self.brains:
-            brain.train()   # haha sounds funny
+            brain.train(is_muss)   # haha sounds funny
         return mi_points, vi_points
 
     def notify_rewards(self, mi_points, vi_points):
@@ -164,7 +159,7 @@ class Belot:
         # therefore, with simple math, one concludes that there
         # is no advantage of simulating the deal rule in bela
         # as opposed to just allocating cards contiguously
-        deck = random_gen.sample(self.deck, len(self.deck))
+        deck = random.sample(self.deck, len(self.deck))
         cards_per_player = len(self.deck) // len(self.players)
         adut_cards = []
         talons = []
@@ -175,14 +170,14 @@ class Belot:
             talons.append(deck[talon_start:player_cards_end])
         return adut_cards, talons
 
-    def get_adut(self, dealer_index: int) -> Tuple[Suit, int]:
+    def get_adut(self, dealer_index: int) -> Tuple[Suit, int, bool]:
         for i in range(1, 1 + len(self.players)):  # the dealer calls last
             player_index = (dealer_index + i) % len(self.players)
             log.debug(f"Player {player_index} bids...")
             player = self.players[player_index]
             adut = player.get_adut(is_muss=(i == 4))
             if adut != Adut.NEXT:
-                to_return = (Suit(adut.value), player_index)
+                to_return = (Suit(adut.value), player_index, i==4)
                 break
         return to_return
 

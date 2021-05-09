@@ -1,10 +1,6 @@
 import abc
 import enum
 import itertools as it
-import logging
-import os
-import random
-import sys
 from collections import defaultdict
 from typing import Dict, List, Optional
 
@@ -19,16 +15,18 @@ from torch_discounted_cumsum import discounted_cumsum_right
 # from .player import 'Player'
 from .card import Adut, Card, Suit
 from .declarations import Declaration
-from .util import get_valid_moves, one_hot_encode
+from .util import get_valid_moves, one_hot_encode, get_logger, get_random
 
-log = logging.getLogger(__name__)
-log.addHandler(logging.StreamHandler(sys.stdout))
-log.setLevel(os.environ.get("BB_LOGLEVEL", "INFO").upper())
 
+log = get_logger(__name__)
+random = get_random()
 
 def cumsum_reverse(x, dim=-1):
     return x + torch.sum(x, dim=dim, keepdims=True) - torch.cumsum(x, dim=dim)
 
+def standardize(x, dim=-1):
+    std, mean = torch.std_mean(x, dim=dim, keepdim=True)
+    return (x - mean) / (std + 1e-7)
 
 def indices_to_mask(indices, num=32, device=torch.device('cuda')):
     mask = torch.zeros(num, dtype=torch.float32, device=device, requires_grad=False)
@@ -122,13 +120,13 @@ class Brain(abc.ABC):
         self.model = Model().to(self.device)
         self.model.eval()
         self.loss = PolicyGradientLoss().to(self.device)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=5e-3)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=1e-2, weight_decay=1e-2)
         self.optimizer.zero_grad()
 
         self.adut_model = AdutModel()
         self.adut_model.eval().to(self.device)
         self.adut_loss = PolicyGradientLoss().to(self.device)
-        self.adut_optimizer = optim.Adam(self.adut_model.parameters(), lr=0.01)
+        self.adut_optimizer = optim.Adam(self.adut_model.parameters(), lr=1e-2, weight_decay=1e-2)
         self.adut_optimizer.zero_grad()
 
         if checkpoint is not None:
@@ -243,7 +241,7 @@ class Brain(abc.ABC):
         )
         assert rewards.shape == samples.shape
         discounted_rewards = cumsum_reverse(rewards, dim=-1)
-
+        discounted_rewards = standardize(discounted_rewards, dim=-1)
         logits = self.model(inputs)
         assert logits.shape == masks.shape
         probs = F.softmax(logits, dim=-1)
@@ -283,11 +281,11 @@ class Brain(abc.ABC):
         self.model.eval()
         return
 
-    def train_adut_model(self):
+    def train_adut_model(self, was_muss):
         assert list(self.adut_cards_per_player.keys()) == list(self.muss_per_player.keys())
         assert list(self.adut_cards_per_player.keys()) == list(self.adut_sampled_per_player.keys())
         #assert list(self.adut_cards_per_player.keys()) == list(self.adut_points_per_player.keys())
-        if len(self.adut_cards_per_player) > 0:
+        if not was_muss and len(self.adut_cards_per_player) > 0:
             # if ai players had a chance to decide adut at all
             self.adut_model.train()
             inputs = torch.tensor(
@@ -327,16 +325,16 @@ class Brain(abc.ABC):
             self.adut_optimizer.step()
             self.adut_optimizer.zero_grad()
 
-            self.adut_cards_per_player.clear()  # = defaultdict(list)
-            self.adut_points_per_player.clear()
-            self.muss_per_player.clear()
-            self.adut_sampled_per_player.clear()
-            self.adut_model.eval()
+        self.adut_cards_per_player.clear()
+        self.adut_points_per_player.clear()
+        self.muss_per_player.clear()
+        self.adut_sampled_per_player.clear()
+        self.adut_model.eval()
         return
 
-    def train(self):
+    def train(self, is_muss):
         self.train_model()
-        self.train_adut_model()
+        self.train_adut_model(is_muss)
         return
 
     def get_adut(self, player, card_idx_list, is_muss):
