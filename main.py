@@ -1,5 +1,6 @@
 from belabot.engine.belot import Belot
 from belabot.engine.player import AiPlayer, BigBrain, RandomPlayer
+from belabot.engine.util import get_logger
 import time
 import torch
 import argparse
@@ -13,24 +14,21 @@ def get_args():
     return parser.parse_args()
 
 def main(args):
+    log = get_logger(__name__)
     big_brain = BigBrain(args.checkpoint)
     big_brain.model.eval()
     print(list(big_brain.model.children()))
     players = [
         AiPlayer("0", big_brain),
-        RandomPlayer("1"),
+        AiPlayer("1", big_brain),#RandomPlayer("1"),
         AiPlayer("2", big_brain),
-        RandomPlayer("3"),
+        AiPlayer("3", big_brain),#RandomPlayer("3"),
     ]
     belot = Belot(players)
     #belot.play()
-    since = time.time()
     for i in range(args.epochs):
-        print(i, end='\t')
-        belot.round(i % 4)
-        new_time = time.time()
-        #log.debug(new_time - since)
-        since = new_time
+        metrics = belot.round(i % 4)
+        log.info(metrics)
     if args.do_save:
         big_brain.save(args.model_filename)
 

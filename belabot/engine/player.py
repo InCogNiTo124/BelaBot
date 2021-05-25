@@ -120,13 +120,13 @@ class Brain(abc.ABC):
         self.model = Model().to(self.device)
         self.model.eval()
         self.loss = PolicyGradientLoss().to(self.device)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=1e-2, weight_decay=1e-2)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=1e-3, weight_decay=1e-5)
         self.optimizer.zero_grad()
 
         self.adut_model = AdutModel()
         self.adut_model.eval().to(self.device)
         self.adut_loss = PolicyGradientLoss().to(self.device)
-        self.adut_optimizer = optim.Adam(self.adut_model.parameters(), lr=1e-2, weight_decay=1e-2)
+        self.adut_optimizer = optim.Adam(self.adut_model.parameters(), lr=1e-3, weight_decay=1e-5)
         self.adut_optimizer.zero_grad()
 
         if checkpoint is not None:
@@ -241,7 +241,7 @@ class Brain(abc.ABC):
         )
         assert rewards.shape == samples.shape
         discounted_rewards = cumsum_reverse(rewards, dim=-1)
-        discounted_rewards = standardize(discounted_rewards, dim=-1)
+        #discounted_rewards = standardize(discounted_rewards, dim=-1)
         logits = self.model(inputs)
         assert logits.shape == masks.shape
         probs = F.softmax(logits, dim=-1)
@@ -255,7 +255,7 @@ class Brain(abc.ABC):
         assert logprobs.shape == rewards.shape
         ##print(rewards)
         loss = self.loss(logprobs, discounted_rewards)
-        log.info(f"PLAY LOSS: \t{loss}")
+        #log.info(f"PLAY LOSS: \t{loss}")
         loss.backward()
         #
         self.optimizer.step()
@@ -279,12 +279,13 @@ class Brain(abc.ABC):
         torch.cuda.empty_cache()
         #print(f'\tTrain time: {time.time() - since}')
         self.model.eval()
-        return
+        return loss.item()
 
     def train_adut_model(self, was_muss):
         assert list(self.adut_cards_per_player.keys()) == list(self.muss_per_player.keys())
         assert list(self.adut_cards_per_player.keys()) == list(self.adut_sampled_per_player.keys())
         #assert list(self.adut_cards_per_player.keys()) == list(self.adut_points_per_player.keys())
+        loss = float('nan')
         if not was_muss and len(self.adut_cards_per_player) > 0:
             # if ai players had a chance to decide adut at all
             self.adut_model.train()
@@ -320,22 +321,23 @@ class Brain(abc.ABC):
             logprobs = c.log_prob(sampled)
             assert logprobs.shape == points.shape, f"{logprobs} {points}"
             loss = self.adut_loss(logprobs, points)
-            log.info(f'ADUT LOSS: {loss}')
+            #log.info(f'ADUT LOSS: {loss}')
             loss.backward()
             self.adut_optimizer.step()
             self.adut_optimizer.zero_grad()
+            loss = loss.item()
 
         self.adut_cards_per_player.clear()
         self.adut_points_per_player.clear()
         self.muss_per_player.clear()
         self.adut_sampled_per_player.clear()
         self.adut_model.eval()
-        return
+        return loss
 
     def train(self, is_muss):
-        self.train_model()
-        self.train_adut_model(is_muss)
-        return
+        play_loss = self.train_model()
+        adut_loss = self.train_adut_model(is_muss)
+        return play_loss, adut_loss
 
     def get_adut(self, player, card_idx_list, is_muss):
         with torch.no_grad():

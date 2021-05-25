@@ -6,10 +6,58 @@ import logging
 import sys
 import os
 import random
+from dataclasses import dataclass, field
+
+@dataclass(init=False, repr=False, eq=False)
+class RoundMetrics:
+    time_start: float
+    time_end: float
+    start_player_index: int
+    adut_caller_index: int
+    mi_points_raw: int
+    vi_points_raw: int
+    mi_points_total: int
+    vi_points_total: int
+    play_loss_per_brain: List[float] = field(default_factory=list)
+    adut_loss_per_brain: List[float] = field(default_factory=list)
+
+    def __init__(self, row=None):
+        if row:
+            row = iter(row.split('|'))
+            self.time_start = float(next(row))
+            self.time_end = float(next(row))
+            self.start_player_index = int(next(row))
+            self.adut_caller_index = int(next(row))
+            self.mi_points_raw = int(next(row))
+            self.vi_points_raw = int(next(row))
+            self.mi_points_total = int(next(row))
+            self.vi_points_total = int(next(row))
+            self.play_loss_per_brain = list(map(float, next(row).split(',')))
+            self.adut_loss_per_brain = list(map(float, next(row).split(',')))
+        else:
+            self.play_loss_per_brain = []
+            self.adut_loss_per_brain = []
+        return
+
+    def __repr__(self):
+        return "|".join(map(str,[
+            self.time_start,
+            self.time_end,
+            self.start_player_index,
+            self.adut_caller_index,
+            self.mi_points_raw,
+            self.vi_points_raw,
+            self.mi_points_total,
+            self.vi_points_total,
+            ','.join(map(str, self.play_loss_per_brain)),
+            ','.join(map(str, self.adut_loss_per_brain))
+        ]))
 
 
 DECK_TOTAL = 162
 STIGLJA_PENALTY = 90
+
+
 
 
 def get_logger(name=__name__):

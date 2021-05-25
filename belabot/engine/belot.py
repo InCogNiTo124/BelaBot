@@ -5,7 +5,8 @@ import more_itertools as mit
 from .card import Adut, Card, Suit
 from .declarations import Declaration, get_player_declarations
 from .player import Player, Brain
-from .util import calculate_points, get_valid_moves, get_winner, get_logger, get_random
+from .util import calculate_points, get_valid_moves, get_winner, get_logger, get_random, RoundMetrics
+import time
 
 random = get_random()
 
@@ -33,23 +34,28 @@ class Belot:
         current_dealer_index = 0
         mi, vi = 0, 0
         while mi <= 1000 and vi <= 1000 or mi == vi:
-            round_mi, round_vi = self.round(current_dealer_index)
+            metrics = self.round(current_dealer_index)
+            round_mi, round_vi = metrics.mi_points_total, metrics.vi_points_total
             current_dealer_index = (current_dealer_index + 1) % 4
             mi += round_mi
             vi += round_vi
-        log.info(f"MI {mi} \t {vi} VI")
+        #log.info(f"MI {mi} \t {vi} VI")
         return
 
     def round(self, dealer_index: int) -> Tuple[int, int]:
+        metrics = RoundMetrics()
+        metrics.time_start = time.time()
+        metrics.start_player_index = dealer_index
         # BIDDING PHASE
         first_6, talons = self.shuffle()
         self.deal_cards(first_6)
         adut, adut_caller_index, is_muss = self.get_adut(dealer_index)
+        metrics.adut_caller_index = adut_caller_index
         mi_bid = (adut_caller_index % 2) == 0
-        log.info(
-            f'{self.players[adut_caller_index].name} ({"MI" if mi_bid else "VI"}) have bid {repr(adut)} for adut'
-            + (" pod muss" if is_muss else "")
-        )
+        #log.info(
+        #    f'{self.players[adut_caller_index].name} ({"MI" if mi_bid else "VI"}) have bid {repr(adut)} for adut'
+        #    + (" pod muss" if is_muss else "")
+        #)
         self.deal_cards(talons)
         all_declarations = self.compute_declarations(
             [player.cards for player in self.players], dealer_index
@@ -101,21 +107,26 @@ class Belot:
             start_player_index = (start_player_index + turn_winner) % len(self.players)
             turn_cards.clear()
         assert (mi_points + vi_points) == 162
-        log.info(f"MI won {repr(mi_points)}, VI won {repr(vi_points)} in game.")
+        #log.info(f"MI won {repr(mi_points)}, VI won {repr(vi_points)} in game.")
+        metrics.mi_points_raw, metrics.vi_points_raw = (mi_points, vi_points)
         mi_points, vi_points = calculate_points(
             mi_points,
             mi_bid,
             sum(t.value() for t in mi_declarations),
             sum(t.value() for t in vi_declarations),
         )
-        log.info(f"MI won {repr(mi_points)}, VI won {repr(vi_points)} in total.")
+        metrics.mi_points_total, metrics.vi_points_total = (mi_points, vi_points)
+        #log.info(f"MI won {repr(mi_points)}, VI won {repr(vi_points)} in total.")
         assert len(self.brains) > 0
         for player in self.players:
             assert len(player.cards) == 0
         self.notify_rewards(mi_points, vi_points)
         for brain in self.brains:
-            brain.train(is_muss)   # haha sounds funny
-        return mi_points, vi_points
+            play_loss, adut_loss = brain.train(is_muss)   # haha sounds funny
+            metrics.play_loss_per_brain.append(play_loss)
+            metrics.adut_loss_per_brain.append(adut_loss)
+        metrics.time_end = time.time()
+        return metrics
 
     def notify_rewards(self, mi_points, vi_points):
         for i, player in enumerate(self.players):
