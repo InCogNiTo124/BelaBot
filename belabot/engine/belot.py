@@ -14,7 +14,7 @@ log = get_logger(__name__)
 
 
 class Belot:
-    def __init__(self, players: Sequence[Player]):
+    def __init__(self, players: Sequence[Player], do_train=True):
         assert len(set(players)) == len(
             players
         ), "The players must all have different names"
@@ -26,6 +26,7 @@ class Belot:
             player.team_setup(teammate, left, right)
             self.brains.add(player.brain)
         self.brains -= {None}
+        self.do_train = do_train
         return
 
     def play(self) -> None:
@@ -122,7 +123,7 @@ class Belot:
             assert len(player.cards) == 0
         self.notify_rewards(mi_points, vi_points)
         for brain in self.brains:
-            play_loss, adut_loss = brain.train(is_muss)   # haha sounds funny
+            play_loss, adut_loss = brain.train(is_muss, update=self.do_train)   # haha sounds funny
             metrics.play_loss_per_brain.append(play_loss)
             metrics.adut_loss_per_brain.append(adut_loss)
         metrics.time_end = time.time()

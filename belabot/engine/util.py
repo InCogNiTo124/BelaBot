@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 @dataclass(init=False, repr=False, eq=False)
 class RoundMetrics:
+    type: str
     time_start: float
     time_end: float
     start_player_index: int
@@ -24,6 +25,7 @@ class RoundMetrics:
     def __init__(self, row=None):
         if row:
             row = iter(row.split('|'))
+            self.type = str(next(row))
             self.time_start = float(next(row))
             self.time_end = float(next(row))
             self.start_player_index = int(next(row))
@@ -41,6 +43,7 @@ class RoundMetrics:
 
     def __repr__(self):
         return "|".join(map(str,[
+            self.type, 
             self.time_start,
             self.time_end,
             self.start_player_index,
