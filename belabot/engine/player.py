@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
-from torch_discounted_cumsum import discounted_cumsum_right
+#from torch_discounted_cumsum import discounted_cumsum_right
 
 # from .player import 'Player'
 from .card import Adut, Card, Suit
